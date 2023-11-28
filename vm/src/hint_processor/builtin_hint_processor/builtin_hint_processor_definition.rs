@@ -112,6 +112,7 @@ use crate::{
     vm::{errors::hint_errors::HintError, vm_core::VirtualMachine},
 };
 use felt::Felt252;
+use crate::hint_processor::builtin_hint_processor::bootloader_hints::prepare_simple_bootloader_output_segment;
 
 #[cfg(feature = "skip_next_instruction_hint")]
 use crate::hint_processor::builtin_hint_processor::skip_next_instruction::skip_next_instruction;
@@ -813,9 +814,13 @@ impl HintProcessorLogic for BuiltinHintProcessor {
             }
             hint_code::EC_RECOVER_PRODUCT_DIV_M => ec_recover_product_div_m(exec_scopes),
             hint_code::SPLIT_XX => split_xx(vm, &hint_data.ids_data, &hint_data.ap_tracking),
+            hint_code::BOOTLOADER_PREPARE_SIMPLE_BOOTLOADER_OUTPUT_SEGMENT => {
+                prepare_simple_bootloader_output_segment(vm, exec_scopes, &hint_data.ids_data, &hint_data.ap_tracking)
+            }
             #[cfg(feature = "skip_next_instruction_hint")]
             hint_code::SKIP_NEXT_INSTRUCTION => skip_next_instruction(vm),
             code => Err(HintError::UnknownHint(code.to_string().into_boxed_str())),
+
         }
     }
 }

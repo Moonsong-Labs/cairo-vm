@@ -23,3 +23,6 @@ cairo-vm-cli/air_input.pub
 ensure-no_std/Cargo.lock
 
 !vm/src/tests/cairo_pie_test_output.json
+
+# JetBrains IDE files
+.idea

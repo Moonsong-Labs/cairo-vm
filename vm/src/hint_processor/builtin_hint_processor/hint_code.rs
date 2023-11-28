@@ -1409,3 +1409,14 @@ ids.x.low = x & ((1<<128)-1)
 ids.x.high = x >> 128";
 #[cfg(feature = "skip_next_instruction_hint")]
 pub const SKIP_NEXT_INSTRUCTION: &str = "skip_next_instruction()";
+
+pub const BOOTLOADER_PREPARE_SIMPLE_BOOTLOADER_OUTPUT_SEGMENT: &str =
+    "from starkware.cairo.bootloaders.bootloader.objects import BootloaderInput
+bootloader_input = BootloaderInput.Schema().load(program_input)
+
+ids.simple_bootloader_output_start = segments.add()
+
+# Change output builtin state to a different segment in preparation for calling the
+# simple bootloader.
+output_builtin_state = output_builtin.get_state()
+output_builtin.new_state(base=ids.simple_bootloader_output_start)";

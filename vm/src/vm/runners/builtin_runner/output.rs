@@ -25,6 +25,14 @@ impl OutputBuiltinRunner {
         }
     }
 
+    pub fn from_segment(segment: &Relocatable, included: bool) -> Self {
+        Self {
+            base: segment.segment_index as usize,
+            stop_ptr: None,
+            included,
+        }
+    }
+
     pub fn initialize_segments(&mut self, segments: &mut MemorySegmentManager) {
         self.base = segments.add().segment_index as usize // segments.add() always returns a positive index
     }
