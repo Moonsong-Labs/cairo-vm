@@ -21,8 +21,8 @@ use super::{
     },
 };
 use crate::hint_processor::builtin_hint_processor::bootloader_hints::{
-    prepare_simple_bootloader_input, prepare_simple_bootloader_output_segment,
-    restore_bootloader_output,
+    load_bootloader_config, prepare_simple_bootloader_input,
+    prepare_simple_bootloader_output_segment, restore_bootloader_output,
 };
 use crate::{
     hint_processor::{
@@ -830,6 +830,9 @@ impl HintProcessorLogic for BuiltinHintProcessor {
             }
             hint_code::BOOTLOADER_PREPARE_SIMPLE_BOOTLOADER_INPUT => {
                 prepare_simple_bootloader_input(exec_scopes)
+            }
+            hint_code::BOOTLOADER_LOAD_BOOTLOADER_CONFIG => {
+                load_bootloader_config(vm, exec_scopes, &hint_data.ids_data, &hint_data.ap_tracking)
             }
             #[cfg(feature = "skip_next_instruction_hint")]
             hint_code::SKIP_NEXT_INSTRUCTION => skip_next_instruction(vm),

@@ -1426,3 +1426,14 @@ pub const BOOTLOADER_PREPARE_SIMPLE_BOOTLOADER_INPUT: &str =
 pub const BOOTLOADER_RESTORE_BOOTLOADER_OUTPUT: &str =
     "# Restore the bootloader's output builtin state.
 output_builtin.set_state(output_builtin_state)";
+pub const BOOTLOADER_LOAD_BOOTLOADER_CONFIG: &str =
+    "from starkware.cairo.bootloaders.bootloader.objects import BootloaderConfig
+bootloader_config: BootloaderConfig = bootloader_input.bootloader_config
+
+ids.bootloader_config = segments.gen_arg(
+    [
+        bootloader_config.simple_bootloader_program_hash,
+        len(bootloader_config.supported_cairo_verifier_program_hashes),
+        bootloader_config.supported_cairo_verifier_program_hashes,
+    ],
+)";
