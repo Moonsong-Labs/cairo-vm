@@ -1421,4 +1421,8 @@ ids.simple_bootloader_output_start = segments.add()
 output_builtin_state = output_builtin.get_state()
 output_builtin.new_state(base=ids.simple_bootloader_output_start)";
 
-pub const BOOTLOADER_PREPARE_SIMPLE_BOOTLOADER_INPUT: &str = "simple_bootloader_input = bootloader_input";
+pub const BOOTLOADER_PREPARE_SIMPLE_BOOTLOADER_INPUT: &str =
+    "simple_bootloader_input = bootloader_input";
+pub const BOOTLOADER_RESTORE_BOOTLOADER_OUTPUT: &str =
+    "# Restore the bootloader's output builtin state.
+output_builtin.set_state(output_builtin_state)";

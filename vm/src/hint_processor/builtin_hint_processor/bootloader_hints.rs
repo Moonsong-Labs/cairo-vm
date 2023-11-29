@@ -117,6 +117,20 @@ pub fn prepare_simple_bootloader_input(exec_scopes: &mut ExecutionScopes) -> Res
     Ok(())
 }
 
+/// Implements
+/// # Restore the bootloader's output builtin state.
+/// output_builtin.set_state(output_builtin_state)
+pub fn restore_bootloader_output(
+    vm: &mut VirtualMachine,
+    exec_scopes: &mut ExecutionScopes,
+) -> Result<(), HintError> {
+    let previous_output_builtin: OutputBuiltinRunner =
+        exec_scopes.get(vars::OUTPUT_BUILTIN_STATE)?;
+    let _ = replace_output_builtin(vm, previous_output_builtin)?;
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use crate::hint_processor::builtin_hint_processor::hint_utils::get_maybe_relocatable_from_var_name;
@@ -232,5 +246,30 @@ mod tests {
             .get(vars::SIMPLE_BOOTLOADER_INPUT)
             .expect("Simple bootloader input not in scope");
         assert_eq!(simple_bootloader_input, bootloader_input);
+    }
+
+    #[test]
+    fn test_restore_bootloader_output() {
+        let mut vm: VirtualMachine = vm!();
+        // The VM must have an existing output segment
+        vm.builtin_runners =
+            vec![OutputBuiltinRunner::from_segment(&vm.add_memory_segment(), true).into()];
+
+        let mut exec_scopes = ExecutionScopes::new();
+        let new_segment = vm.add_memory_segment();
+        let original_output_builtin = OutputBuiltinRunner::from_segment(&new_segment, true);
+        exec_scopes.insert_value(vars::OUTPUT_BUILTIN_STATE, original_output_builtin.clone());
+
+        restore_bootloader_output(&mut vm, &mut exec_scopes).expect("Error while executing hint");
+
+        assert_eq!(vm.builtin_runners.len(), 1);
+        match &vm.builtin_runners[0] {
+            BuiltinRunner::Output(output_builtin) => {
+                assert_eq!(output_builtin.base(), original_output_builtin.base());
+                assert_eq!(output_builtin.stop_ptr, original_output_builtin.stop_ptr);
+                assert_eq!(output_builtin.included, original_output_builtin.included);
+            }
+            other => panic!("Expected an output builtin, found {:?}", other),
+        }
     }
 }
