@@ -17,30 +17,33 @@ mod vars {
 
     /// Saved state of the output builtin.
     pub(crate) const OUTPUT_BUILTIN_STATE: &str = "output_builtin_state";
+
+    /// Deserialized simple bootloader input.
+    pub(crate) const SIMPLE_BOOTLOADER_INPUT: &str = "simple_bootloader_input";
 }
 
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Deserialize, Debug, Clone, PartialEq)]
 #[serde(transparent)]
 pub struct ProgramHash(pub u64);
 
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Deserialize, Debug, Clone, PartialEq)]
 pub struct BootloaderConfig {
     pub simple_bootloader_program_hash: ProgramHash,
     pub supported_cairo_verifier_program_hashes: Vec<ProgramHash>,
 }
 
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Deserialize, Debug, Clone, PartialEq)]
 pub struct PackedOutput {
     // TODO: missing definitions of PlainPackedOutput, CompositePackedOutput
 }
 
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Deserialize, Debug, Clone, PartialEq)]
 pub struct SimpleBootloaderInput {
     pub fact_topologies_path: Option<String>,
     pub single_page: bool,
 }
 
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Deserialize, Debug, Clone, PartialEq)]
 pub struct BootloaderInput {
     pub simple_bootloader_input: SimpleBootloaderInput,
     pub bootloader_config: BootloaderConfig,
@@ -102,6 +105,14 @@ pub fn prepare_simple_bootloader_output_segment(
         ids_data,
         ap_tracking,
     )?;
+
+    Ok(())
+}
+
+/// Implements %{ simple_bootloader_input = bootloader_input %}
+pub fn prepare_simple_bootloader_input(exec_scopes: &mut ExecutionScopes) -> Result<(), HintError> {
+    let bootloader_input: BootloaderInput = exec_scopes.get(vars::BOOTLOADER_INPUT)?;
+    exec_scopes.insert_value(vars::SIMPLE_BOOTLOADER_INPUT, bootloader_input);
 
     Ok(())
 }
@@ -198,5 +209,28 @@ mod tests {
         assert!(
             matches!(hint_error, HintError::VariableNotInScopeError(s) if s == vars::BOOTLOADER_INPUT.into())
         );
+    }
+    #[test]
+    fn test_prepare_simple_bootloader_input() {
+        let mut exec_scopes = ExecutionScopes::new();
+        let bootloader_input = BootloaderInput {
+            simple_bootloader_input: SimpleBootloaderInput {
+                fact_topologies_path: None,
+                single_page: false,
+            },
+            bootloader_config: BootloaderConfig {
+                simple_bootloader_program_hash: ProgramHash(123),
+                supported_cairo_verifier_program_hashes: vec![ProgramHash(456), ProgramHash(789)],
+            },
+            packed_outputs: vec![],
+        };
+        exec_scopes.insert_value(vars::BOOTLOADER_INPUT, bootloader_input.clone());
+
+        prepare_simple_bootloader_input(&mut exec_scopes).expect("Hint failed unexpectedly");
+
+        let simple_bootloader_input: BootloaderInput = exec_scopes
+            .get(vars::SIMPLE_BOOTLOADER_INPUT)
+            .expect("Simple bootloader input not in scope");
+        assert_eq!(simple_bootloader_input, bootloader_input);
     }
 }
