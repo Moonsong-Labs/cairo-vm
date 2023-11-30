@@ -875,6 +875,10 @@ impl VirtualMachine {
         Err(VirtualMachineError::NoSignatureBuiltin)
     }
 
+    /// Returns a mutable reference to the output builtin.
+    ///
+    /// Returns Err(VirtualMachineError::NoOutputBuiltin) if there is no output builtin
+    /// configured.
     pub fn get_output_builtin(
         &mut self,
     ) -> Result<&mut OutputBuiltinRunner, VirtualMachineError> {

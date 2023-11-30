@@ -136,11 +136,18 @@ mod tests {
         };
 
         exec_scopes.insert_value(vars::BOOTLOADER_INPUT, bootloader_input);
-        prepare_simple_bootloader_output_segment(&mut vm, &mut exec_scopes, &ids_data, &ap_tracking).expect("Hint failed unexpectedly");
+        prepare_simple_bootloader_output_segment(
+            &mut vm,
+            &mut exec_scopes,
+            &ids_data,
+            &ap_tracking,
+        )
+        .expect("Hint failed unexpectedly");
 
         let current_output_builtin = vm
             .get_output_builtin()
-            .expect("The VM should have an output builtin").clone();
+            .expect("The VM should have an output builtin")
+            .clone();
         let stored_output_builtin: OutputBuiltinRunner = exec_scopes
             .get(vars::OUTPUT_BUILTIN_STATE)
             .expect("The output builtin is not stored in the execution scope as expected");
@@ -158,12 +165,9 @@ mod tests {
             &ap_tracking,
         )
         .expect("Simple bootloader output start not accessible from program IDs");
-        match simple_bootloader_output_start {
-            MaybeRelocatable::RelocatableValue(relocatable) => {
-                assert_eq!(relocatable.segment_index, current_output_builtin.base() as isize);
-            }
-            other => panic!("Expected a relocatable value but got {:?}", other)
-        }
+        assert!(
+            matches!(simple_bootloader_output_start, MaybeRelocatable::RelocatableValue(relocatable) if relocatable.segment_index == current_output_builtin.base() as isize)
+        );
     }
 
     #[test]
@@ -179,13 +183,10 @@ mod tests {
             &ids_data,
             &ap_tracking,
         );
-        assert!(result.is_err());
-        let hint_error = result.unwrap_err();
-        match hint_error {
-            HintError::VariableNotInScopeError(s) => {
-                assert_eq!(s, vars::BOOTLOADER_INPUT.into());
-            }
-            _ => panic!("Unexpected hint error: {:?}", hint_error),
-        }
+        let hint_error =
+            result.expect_err("Hint should fail, the bootloader input variable is not set");
+        assert!(
+            matches!(hint_error, HintError::VariableNotInScopeError(s) if s == vars::BOOTLOADER_INPUT.into())
+        );
     }
 }
