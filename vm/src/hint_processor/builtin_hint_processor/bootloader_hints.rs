@@ -11,7 +11,6 @@ use crate::vm::errors::vm_errors::VirtualMachineError;
 use crate::vm::runners::builtin_runner::OutputBuiltinRunner;
 use crate::vm::vm_core::VirtualMachine;
 
-/// Names for internal variables stored in the execution scope.
 mod vars {
     /// Deserialized bootloader input.
     pub(crate) const BOOTLOADER_INPUT: &str = "bootloader_input";
@@ -36,7 +35,14 @@ pub struct PackedOutput {
 }
 
 #[derive(Deserialize, Debug, Clone)]
+pub struct SimpleBootloaderInput {
+    pub fact_topologies_path: Option<String>,
+    pub single_page: bool,
+}
+
+#[derive(Deserialize, Debug, Clone)]
 pub struct BootloaderInput {
+    pub simple_bootloader_input: SimpleBootloaderInput,
     pub bootloader_config: BootloaderConfig,
     pub packed_outputs: Vec<PackedOutput>,
 }
@@ -128,6 +134,10 @@ mod tests {
         let ap_tracking = ApTracking::new();
 
         let bootloader_input = BootloaderInput {
+            simple_bootloader_input: SimpleBootloaderInput {
+                fact_topologies_path: None,
+                single_page: false,
+            },
             bootloader_config: BootloaderConfig {
                 simple_bootloader_program_hash: ProgramHash(1234),
                 supported_cairo_verifier_program_hashes: vec![ProgramHash(5678), ProgramHash(8765)],
