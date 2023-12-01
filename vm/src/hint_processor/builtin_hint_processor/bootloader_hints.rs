@@ -182,7 +182,9 @@ pub fn set_packed_output_to_subtasks_hint(
     _ids_data: &HashMap<String, HintReference>,
     _ap_tracking: &ApTracking,
 ) -> Result<(), HintError> {
-    let packed_outputs = exec_scopes.get("packed_outputs")?;
+    use felt::Felt252;
+
+    let packed_outputs = exec_scopes.get::<Felt252>("packed_output")?; // TODO: need real type
     let subtasks = packed_outputs; // TODO: need type for packed_output / query its subtasks field
     exec_scopes.insert_value("packed_outputs", subtasks);
     Ok(())
@@ -435,6 +437,36 @@ mod tests {
         );
 
         assert_eq!(saved_packed_outputs.expect("asserted Ok above, qed").len(), 3);
+    }
+
+    #[test]
+    fn test_set_packed_output_to_subtasks_hint() {
+        use crate::hint_processor::builtin_hint_processor::hint_code::BOOTLOADER_SET_PACKED_OUTPUT_TO_SUBTASKS;
+        use felt::Felt252;
+
+        let mut vm = vm!();
+        let mut exec_scopes = ExecutionScopes::new();
+
+        exec_scopes.insert_box("packed_output", Box::new(Felt252::from(42)));
+
+        let hint_data =
+            HintProcessorData::new_default(String::from(BOOTLOADER_SET_PACKED_OUTPUT_TO_SUBTASKS), HashMap::new());
+        let mut hint_processor = BuiltinHintProcessor::new_empty();
+        assert_matches!(
+            hint_processor.execute_hint(
+                &mut vm,
+                &mut exec_scopes,
+                &any_box!(hint_data),
+                &HashMap::new(),
+            ),
+            Ok(())
+        );
+
+        let packed_outputs = exec_scopes.get::<Felt252>("packed_outputs");
+        assert_matches!(
+            packed_outputs,
+            Ok(x) if x == Felt252::from(42)
+        );
     }
 
 }
