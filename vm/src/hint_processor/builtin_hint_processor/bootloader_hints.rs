@@ -1,10 +1,14 @@
 use std::any::Any;
 use std::collections::HashMap;
 
-use felt::Felt252;
+use num_traits::ToPrimitive;
 use serde::Deserialize;
 
-use crate::hint_processor::builtin_hint_processor::hint_utils::insert_value_from_var_name;
+use felt::Felt252;
+
+use crate::hint_processor::builtin_hint_processor::hint_utils::{
+    get_integer_from_var_name, insert_value_from_var_name,
+};
 use crate::hint_processor::hint_processor_definition::HintReference;
 use crate::serde::deserialize_program::ApTracking;
 use crate::types::exec_scope::ExecutionScopes;
@@ -24,6 +28,12 @@ mod vars {
 
     /// Deserialized simple bootloader input.
     pub(crate) const SIMPLE_BOOTLOADER_INPUT: &str = "simple_bootloader_input";
+
+    /// Packed outputs.
+    pub(crate) const PACKED_OUTPUTS: &str = "packed_outputs";
+
+    /// Packed output for the current task.
+    pub(crate) const PACKED_OUTPUT: &str = "packed_output";
 }
 
 #[derive(Deserialize, Debug, Clone, PartialEq)]
@@ -209,8 +219,44 @@ pub fn load_bootloader_config(
     Ok(())
 }
 
+/// Implements
+/// from starkware.cairo.bootloaders.bootloader.objects import PackedOutput
+///
+/// task_id = len(packed_outputs) - ids.n_subtasks
+/// packed_output: PackedOutput = packed_outputs[task_id]
+///
+/// vm_enter_scope(new_scope_locals=dict(packed_output=packed_output))
+pub fn enter_packed_output_scope(
+    vm: &mut VirtualMachine,
+    exec_scopes: &mut ExecutionScopes,
+    ids_data: &HashMap<String, HintReference>,
+    ap_tracking: &ApTracking,
+) -> Result<(), HintError> {
+    // task_id = len(packed_outputs) - ids.n_subtasks
+    let packed_outputs: Vec<PackedOutput> = exec_scopes.get(vars::PACKED_OUTPUTS)?;
+    let n_subtasks = get_integer_from_var_name("n_subtasks", vm, ids_data, ap_tracking)
+        .unwrap()
+        .to_usize()
+        .unwrap();
+    let task_id = packed_outputs.len() - n_subtasks;
+    // packed_output: PackedOutput = packed_outputs[task_id]
+    let packed_output: Box<dyn Any> = Box::new(packed_outputs[task_id].clone());
+
+    // vm_enter_scope(new_scope_locals=dict(packed_output=packed_output))
+    exec_scopes.enter_scope(HashMap::from([(
+        vars::PACKED_OUTPUT.to_string(),
+        packed_output,
+    )]));
+
+    Ok(())
+}
 #[cfg(test)]
 mod tests {
+    use std::ops::Add;
+
+    use num_traits::ToPrimitive;
+    use rstest::{fixture, rstest};
+
     use crate::hint_processor::builtin_hint_processor::hint_utils::{
         get_maybe_relocatable_from_var_name, get_ptr_from_var_name,
     };
@@ -220,9 +266,6 @@ mod tests {
     use crate::utils::test_utils::*;
     use crate::vm::runners::builtin_runner::BuiltinRunner;
     use crate::vm::vm_core::VirtualMachine;
-    use num_traits::ToPrimitive;
-    use rstest::{fixture, rstest};
-    use std::ops::Add;
 
     use super::*;
 
@@ -452,5 +495,38 @@ mod tests {
 
         assert_eq!(*nested_values[0], 128.into());
         assert_eq!(*nested_values[1], 42.into());
+    }
+
+    #[rstest]
+    fn test_enter_packed_output_scope() {
+        let mut vm = vm!();
+        // Set n_subtasks to 2
+        vm.run_context.fp = 1;
+        vm.segments = segments![((1, 0), 2)];
+        let ids_data = ids_data!["n_subtasks"];
+
+        let ap_tracking = ApTracking::default();
+
+        let mut exec_scopes = ExecutionScopes::new();
+
+        let packed_outputs = vec![
+            PackedOutput::Plain(vec![]),
+            PackedOutput::Composite(vec![]),
+            PackedOutput::Plain(vec![]),
+        ];
+        exec_scopes.insert_value(vars::PACKED_OUTPUTS, packed_outputs);
+
+        enter_packed_output_scope(&mut vm, &mut exec_scopes, &ids_data, &ap_tracking)
+            .expect("Hint failed unexpectedly");
+
+        // Check that we entered a new scope
+        assert_eq!(exec_scopes.data.len(), 2);
+        assert_eq!(exec_scopes.data[1].len(), 1);
+
+        let packed_output = exec_scopes
+            .get(vars::PACKED_OUTPUT)
+            .expect("PACKED_OUTPUT not present in scope");
+
+        assert!(matches!(packed_output, PackedOutput::Composite(_)));
     }
 }
