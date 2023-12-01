@@ -250,6 +250,17 @@ pub fn enter_packed_output_scope(
 
     Ok(())
 }
+
+/// Implements
+/// from starkware.cairo.bootloaders.bootloader.objects import (
+///     CompositePackedOutput,
+///     PlainPackedOutput,
+/// )
+pub fn import_packed_output_schemas() -> Result<(), HintError> {
+    // Nothing to do!
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use std::ops::Add;

@@ -1447,3 +1447,9 @@ task_id = len(packed_outputs) - ids.n_subtasks
 packed_output: PackedOutput = packed_outputs[task_id]
 
 vm_enter_scope(new_scope_locals=dict(packed_output=packed_output))";
+
+pub const BOOTLOADER_IMPORT_PACKED_OUTPUT_SCHEMAS: &str =
+    "from starkware.cairo.bootloaders.bootloader.objects import (
+    CompositePackedOutput,
+    PlainPackedOutput,
+)";
