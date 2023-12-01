@@ -101,6 +101,8 @@ pub enum RunnerError {
     StrippedProgramNoMain,
     #[error(transparent)]
     Trace(#[from] TraceError),
+    #[error("Page ({0}) is not on the expected segment {1}")]
+    PageNotOnSegment(Relocatable, usize),
 }
 
 #[cfg(test)]

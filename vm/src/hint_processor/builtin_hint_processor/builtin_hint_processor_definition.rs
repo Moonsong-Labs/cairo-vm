@@ -27,6 +27,7 @@ use super::{
         pack::*,
     },
 };
+use crate::hint_processor::builtin_hint_processor::bootloader::bootloader_hints::compute_and_configure_fact_topologies;
 use crate::hint_processor::builtin_hint_processor::bootloader::execute_task_hints::allocate_program_data_segment;
 use crate::hint_processor::builtin_hint_processor::bootloader::simple_bootloader_hints::{
     divide_num_by_2, prepare_task_range_checks, set_ap_to_zero, set_current_task,
@@ -859,6 +860,9 @@ impl HintProcessorLogic for BuiltinHintProcessor {
                     &hint_data.ids_data,
                     &hint_data.ap_tracking,
                 )
+            }
+            hint_code::BOOTLOADER_COMPUTE_FACT_TOPOLOGIES => {
+                compute_and_configure_fact_topologies(vm, exec_scopes)
             }
             hint_code::BOOTLOADER_SET_PACKED_OUTPUT_TO_SUBTASKS => {
                 set_packed_output_to_subtasks(exec_scopes)

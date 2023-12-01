@@ -1,5 +1,6 @@
 use felt::Felt252;
 use serde::Deserialize;
+use std::path::PathBuf;
 
 #[derive(Deserialize, Debug, Clone, PartialEq)]
 pub struct BootloaderConfig {
@@ -21,9 +22,6 @@ impl PackedOutput {
 }
 
 #[derive(Deserialize, Debug, Clone, PartialEq)]
-pub struct FactTopology {}
-
-#[derive(Deserialize, Debug, Clone, PartialEq)]
 pub struct Task {}
 
 #[derive(Deserialize, Debug, Clone, PartialEq)]
@@ -39,7 +37,7 @@ impl TaskSpec {
 
 #[derive(Deserialize, Debug, Clone, PartialEq)]
 pub struct SimpleBootloaderInput {
-    pub fact_topologies_path: Option<String>,
+    pub fact_topologies_path: Option<PathBuf>,
     pub single_page: bool,
     pub tasks: Vec<TaskSpec>,
 }

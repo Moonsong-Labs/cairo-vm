@@ -1,6 +1,9 @@
 use std::any::Any;
 use std::collections::HashMap;
 
+use crate::hint_processor::builtin_hint_processor::bootloader::fact_topologies::{
+    compute_fact_topologies, configure_fact_topologies, write_to_fact_topologies_file, FactTopology,
+};
 use felt::Felt252;
 use num_traits::ToPrimitive;
 
@@ -268,7 +271,7 @@ pub fn save_output_pointer(
     ap_tracking: &ApTracking,
 ) -> Result<(), HintError> {
     let output_ptr = get_ptr_from_var_name("output_ptr", vm, ids_data, ap_tracking)?;
-    exec_scopes.insert_value("output_start", output_ptr);
+    exec_scopes.insert_value(vars::OUTPUT_START, output_ptr);
     Ok(())
 }
 
@@ -282,6 +285,63 @@ pub fn save_packed_outputs(exec_scopes: &mut ExecutionScopes) -> Result<(), Hint
     let bootloader_input: BootloaderInput = exec_scopes.get("bootloader_input")?;
     let packed_outputs = bootloader_input.packed_outputs;
     exec_scopes.insert_value("packed_outputs", packed_outputs);
+    Ok(())
+}
+
+/// Implements
+/// const COMPUTE_FACT_TOPOLOGIES: &str = "from typing import List
+///
+/// from starkware.cairo.bootloaders.bootloader.utils import compute_fact_topologies
+/// from starkware.cairo.bootloaders.fact_topology import FactTopology
+/// from starkware.cairo.bootloaders.simple_bootloader.utils import (
+///     configure_fact_topologies,
+///     write_to_fact_topologies_file,
+/// )
+///
+/// # Compute the fact topologies of the plain packed outputs based on packed_outputs and
+/// # fact_topologies of the inner tasks.
+/// plain_fact_topologies: List[FactTopology] = compute_fact_topologies(
+///     packed_outputs=packed_outputs, fact_topologies=fact_topologies,
+/// )
+///
+/// # Configure the memory pages in the output builtin, based on plain_fact_topologies.
+/// configure_fact_topologies(
+///     fact_topologies=plain_fact_topologies, output_start=output_start,
+///     output_builtin=output_builtin,
+/// )
+///
+/// # Dump fact topologies to a json file.
+/// if bootloader_input.fact_topologies_path is not None:
+///     write_to_fact_topologies_file(
+///         fact_topologies_path=bootloader_input.fact_topologies_path,
+///         fact_topologies=plain_fact_topologies,
+///     )";
+pub fn compute_and_configure_fact_topologies(
+    vm: &mut VirtualMachine,
+    exec_scopes: &mut ExecutionScopes,
+) -> Result<(), HintError> {
+    let bootloader_input: BootloaderInput = exec_scopes.get(vars::BOOTLOADER_INPUT)?;
+    let packed_outputs: Vec<PackedOutput> = exec_scopes.get(vars::PACKED_OUTPUTS)?;
+    let fact_topologies: Vec<FactTopology> = exec_scopes.get(vars::FACT_TOPOLOGIES)?;
+    let mut output_start: Relocatable = exec_scopes.get(vars::OUTPUT_START)?;
+    let output_builtin = vm.get_output_builtin()?;
+
+    let plain_fact_topologies = compute_fact_topologies(&packed_outputs, &fact_topologies)
+        .map_err(Into::<HintError>::into)?;
+
+    configure_fact_topologies(&plain_fact_topologies, &mut output_start, output_builtin)
+        .map_err(Into::<HintError>::into)?;
+
+    exec_scopes.insert_value(vars::OUTPUT_START, output_start);
+
+    if let Some(path) = bootloader_input
+        .simple_bootloader_input
+        .fact_topologies_path
+    {
+        write_to_fact_topologies_file(path.as_path(), &plain_fact_topologies)
+            .map_err(Into::<HintError>::into)?;
+    }
+
     Ok(())
 }
 
@@ -382,6 +442,7 @@ mod tests {
     use crate::types::relocatable::MaybeRelocatable;
     use crate::utils::test_utils::*;
     use crate::vm::runners::builtin_runner::BuiltinRunner;
+    use crate::vm::runners::cairo_pie::PublicMemoryPage;
     use crate::vm::vm_core::VirtualMachine;
     use crate::{any_box, relocatable};
     use assert_matches::assert_matches;
@@ -720,7 +781,7 @@ mod tests {
     }
 
     #[test]
-    fn test_save_packed_ouputs() {
+    fn test_save_packed_outputs() {
         let packed_outputs = vec![
             PackedOutput::Plain(Default::default()),
             PackedOutput::Plain(Default::default()),
@@ -769,6 +830,56 @@ mod tests {
         assert_eq!(
             saved_packed_outputs.expect("asserted Ok above, qed").len(),
             3
+        );
+    }
+
+    #[rstest]
+    fn test_compute_and_configure_fact_topologies(bootloader_input: BootloaderInput) {
+        let mut vm = vm!();
+        let mut output_builtin = OutputBuiltinRunner::new(true);
+        output_builtin.initialize_segments(&mut vm.segments);
+        vm.builtin_runners
+            .push(BuiltinRunner::Output(output_builtin.clone()));
+
+        let mut exec_scopes = ExecutionScopes::new();
+        let packed_outputs = vec![PackedOutput::Plain(vec![]), PackedOutput::Plain(vec![])];
+        let fact_topologies = vec![
+            FactTopology {
+                tree_structure: vec![],
+                page_sizes: vec![3usize, 1usize],
+            },
+            FactTopology {
+                tree_structure: vec![],
+                page_sizes: vec![10usize],
+            },
+        ];
+        let output_start = Relocatable {
+            segment_index: output_builtin.base() as isize,
+            offset: 0,
+        };
+        exec_scopes.insert_value(vars::BOOTLOADER_INPUT, bootloader_input);
+        exec_scopes.insert_value(vars::PACKED_OUTPUTS, packed_outputs);
+        exec_scopes.insert_value(vars::FACT_TOPOLOGIES, fact_topologies);
+        exec_scopes.insert_value(vars::OUTPUT_START, output_start);
+
+        compute_and_configure_fact_topologies(&mut vm, &mut exec_scopes)
+            .expect("Hint failed unexpectedly");
+
+        let output_start: Relocatable = exec_scopes.get(vars::OUTPUT_START).unwrap();
+        assert_eq!(
+            output_start,
+            Relocatable {
+                segment_index: 0,
+                offset: 18
+            }
+        );
+        assert_eq!(
+            vm.get_output_builtin().unwrap().pages,
+            HashMap::from([
+                (1, PublicMemoryPage { start: 2, size: 3 }),
+                (2, PublicMemoryPage { start: 5, size: 1 }),
+                (3, PublicMemoryPage { start: 8, size: 10 }),
+            ])
         );
     }
 

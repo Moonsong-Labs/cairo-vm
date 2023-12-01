@@ -4,6 +4,9 @@ pub(crate) const BOOTLOADER_INPUT: &str = "bootloader_input";
 /// Saved state of the output builtin.
 pub(crate) const OUTPUT_BUILTIN_STATE: &str = "output_builtin_state";
 
+/// Output builtin segment start.
+pub(crate) const OUTPUT_START: &str = "output_start";
+
 /// Deserialized simple bootloader input.
 pub(crate) const SIMPLE_BOOTLOADER_INPUT: &str = "simple_bootloader_input";
 

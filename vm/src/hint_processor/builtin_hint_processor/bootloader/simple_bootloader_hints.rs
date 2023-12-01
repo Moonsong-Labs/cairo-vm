@@ -2,11 +2,10 @@ use num_integer::Integer;
 use num_traits::ToPrimitive;
 use std::collections::HashMap;
 
+use crate::hint_processor::builtin_hint_processor::bootloader::fact_topologies::FactTopology;
 use felt::Felt252;
 
-use crate::hint_processor::builtin_hint_processor::bootloader::types::{
-    FactTopology, SimpleBootloaderInput,
-};
+use crate::hint_processor::builtin_hint_processor::bootloader::types::SimpleBootloaderInput;
 use crate::hint_processor::builtin_hint_processor::bootloader::vars;
 use crate::hint_processor::builtin_hint_processor::hint_utils::{
     get_integer_from_var_name, get_ptr_from_var_name, insert_value_from_var_name,
@@ -134,6 +133,7 @@ mod tests {
     use num_traits::ToPrimitive;
     use std::collections::HashMap;
 
+    use crate::hint_processor::builtin_hint_processor::bootloader::fact_topologies::FactTopology;
     use felt::Felt252;
     use rstest::{fixture, rstest};
 
@@ -142,7 +142,7 @@ mod tests {
         set_tasks_variable,
     };
     use crate::hint_processor::builtin_hint_processor::bootloader::types::{
-        FactTopology, SimpleBootloaderInput, Task, TaskSpec,
+        SimpleBootloaderInput, Task, TaskSpec,
     };
     use crate::hint_processor::builtin_hint_processor::bootloader::vars;
     use crate::hint_processor::builtin_hint_processor::hint_utils::{

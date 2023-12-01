@@ -1460,6 +1460,34 @@ pub const BOOTLOADER_SAVE_OUTPUT_POINTER: &str = "output_start = ids.output_ptr"
 
 pub const BOOTLOADER_SAVE_PACKED_OUTPUTS: &str = "packed_outputs = bootloader_input.packed_outputs";
 
+pub const BOOTLOADER_COMPUTE_FACT_TOPOLOGIES: &str = "from typing import List
+
+from starkware.cairo.bootloaders.bootloader.utils import compute_fact_topologies
+from starkware.cairo.bootloaders.fact_topology import FactTopology
+from starkware.cairo.bootloaders.simple_bootloader.utils import (
+    configure_fact_topologies,
+    write_to_fact_topologies_file,
+)
+
+# Compute the fact topologies of the plain packed outputs based on packed_outputs and
+# fact_topologies of the inner tasks.
+plain_fact_topologies: List[FactTopology] = compute_fact_topologies(
+    packed_outputs=packed_outputs, fact_topologies=fact_topologies,
+)
+
+# Configure the memory pages in the output builtin, based on plain_fact_topologies.
+configure_fact_topologies(
+    fact_topologies=plain_fact_topologies, output_start=output_start,
+    output_builtin=output_builtin,
+)
+
+# Dump fact topologies to a json file.
+if bootloader_input.fact_topologies_path is not None:
+    write_to_fact_topologies_file(
+        fact_topologies_path=bootloader_input.fact_topologies_path,
+        fact_topologies=plain_fact_topologies,
+    )";
+
 pub const BOOTLOADER_GUESS_PRE_IMAGE_OF_SUBTASKS_OUTPUT_HASH: &str =
     "data = packed_output.elements_for_hash()
 ids.nested_subtasks_output_len = len(data)
