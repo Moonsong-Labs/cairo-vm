@@ -18,7 +18,7 @@ use super::{
         fq::{inv_mod_p_uint256, uint512_unsigned_div_rem},
         inv_mod_p_uint512::inv_mod_p_uint512,
         pack::*,
-    },
+    }, bootloader_hints::{save_output_pointer_hint, save_packed_outputs_hint, set_packed_output_to_subtasks_hint, guess_pre_image_of_subtasks_output_hash_hint},
 };
 use crate::{
     hint_processor::{
@@ -816,6 +816,18 @@ impl HintProcessorLogic for BuiltinHintProcessor {
             hint_code::SPLIT_XX => split_xx(vm, &hint_data.ids_data, &hint_data.ap_tracking),
             hint_code::BOOTLOADER_PREPARE_SIMPLE_BOOTLOADER_OUTPUT_SEGMENT => {
                 prepare_simple_bootloader_output_segment(vm, exec_scopes, &hint_data.ids_data, &hint_data.ap_tracking)
+            }
+            hint_code::BOOTLOADER_SAVE_OUTPUT_POINTER => {
+                save_output_pointer_hint(vm, exec_scopes, &hint_data.ids_data, &hint_data.ap_tracking)
+            }
+            hint_code::BOOTLOADER_SAVE_PACKED_OUTPUTS => {
+                save_packed_outputs_hint(vm, exec_scopes, &hint_data.ids_data, &hint_data.ap_tracking)
+            }
+            hint_code::BOOTLOADER_GUESS_PRE_IMAGE_OF_SUBTASKS_OUTPUT_HASH => {
+                guess_pre_image_of_subtasks_output_hash_hint(vm, exec_scopes, &hint_data.ids_data, &hint_data.ap_tracking)
+            }
+            hint_code::BOOTLOADER_SET_PACKED_OUTPUT_TO_SUBTASKS => {
+                set_packed_output_to_subtasks_hint(vm, exec_scopes, &hint_data.ids_data, &hint_data.ap_tracking)
             }
             #[cfg(feature = "skip_next_instruction_hint")]
             hint_code::SKIP_NEXT_INSTRUCTION => skip_next_instruction(vm),

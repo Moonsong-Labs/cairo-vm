@@ -2,7 +2,10 @@ use std::collections::HashMap;
 
 use serde::Deserialize;
 
-use crate::hint_processor::builtin_hint_processor::hint_utils::insert_value_from_var_name;
+use crate::hint_processor::builtin_hint_processor::hint_utils::{
+    get_ptr_from_var_name,
+    insert_value_from_var_name,
+};
 use crate::hint_processor::hint_processor_definition::HintReference;
 use crate::serde::deserialize_program::ApTracking;
 use crate::types::exec_scope::ExecutionScopes;
@@ -113,12 +116,11 @@ Implements hint:
     output_start = ids.output_ptr
 %}
 */
-fn save_output_pointer_hint(
+pub fn save_output_pointer_hint(
     vm: &mut VirtualMachine,
     exec_scopes: &mut ExecutionScopes,
     ids_data: &HashMap<String, HintReference>,
     ap_tracking: &ApTracking,
-    _constants: &HashMap<String, Felt252>,
 ) -> Result<(), HintError> {
     let output_ptr = get_ptr_from_var_name("output_ptr", vm, ids_data, ap_tracking)?;
     exec_scopes.insert_value("output_start", output_ptr);
@@ -131,12 +133,11 @@ Implements hint:
     packed_outputs = bootloader_input.packed_outputs
 %}
 */
-fn save_packed_outputs_hint(
+pub fn save_packed_outputs_hint(
     _vm: &mut VirtualMachine,
     exec_scopes: &mut ExecutionScopes,
     _ids_data: &HashMap<String, HintReference>,
     _ap_tracking: &ApTracking,
-    _constants: &HashMap<String, Felt252>,
 ) -> Result<(), HintError> {
     let bootloader_input = exec_scopes.get("bootloader_input")?;
     let packed_outputs = bootloader_input; // TODO: need type for bootloader_input / query its packed_outputs field
@@ -150,12 +151,11 @@ Implements hint:
     packed_outputs = packed_output.subtasks
 %}
 */
-fn set_packed_output_to_subtasks_hint(
+pub fn set_packed_output_to_subtasks_hint(
     _vm: &mut VirtualMachine,
     exec_scopes: &mut ExecutionScopes,
     _ids_data: &HashMap<String, HintReference>,
     _ap_tracking: &ApTracking,
-    _constants: &HashMap<String, Felt252>,
 ) -> Result<(), HintError> {
     let packed_outputs = exec_scopes.get("packed_outputs")?;
     let subtasks = packed_outputs; // TODO: need type for packed_output / query its subtasks field
@@ -171,12 +171,11 @@ Implements hint:
     ids.nested_subtasks_output = segments.gen_arg(data)";
 %}
 */
-fn guess_pre_image_of_subtasks_output_hash_hint(
+pub fn guess_pre_image_of_subtasks_output_hash_hint(
     vm: &mut VirtualMachine,
     exec_scopes: &mut ExecutionScopes,
     ids_data: &HashMap<String, HintReference>,
     ap_tracking: &ApTracking,
-    _constants: &HashMap<String, Felt252>,
 ) -> Result<(), HintError> {
     let packed_outputs = exec_scopes.get::<Relocatable>("packed_outputs")?;
     let data = packed_outputs; // TODO: need type for packed_output / call its elements_for_hash() fn
