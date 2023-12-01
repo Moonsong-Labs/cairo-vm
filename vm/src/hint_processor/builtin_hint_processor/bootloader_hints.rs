@@ -205,8 +205,8 @@ pub fn guess_pre_image_of_subtasks_output_hash_hint(
     let packed_outputs = exec_scopes.get::<Relocatable>("packed_outputs")?;
     let data = packed_outputs; // TODO: need type for packed_output / call its elements_for_hash() fn
     let data_len = 0usize; // TODO: should be length of data
-    insert_value_from_var_name( "nested_subtasks_output_len", data_len, vm, ids_data, ap_tracking)?;
-    insert_value_from_var_name( "nested_subtasks_output", &data, vm, ids_data, ap_tracking)?;
+    insert_value_from_var_name("nested_subtasks_output_len", data_len, vm, ids_data, ap_tracking)?;
+    insert_value_from_var_name("nested_subtasks_output", &data, vm, ids_data, ap_tracking)?;
     Ok(())
 }
 
