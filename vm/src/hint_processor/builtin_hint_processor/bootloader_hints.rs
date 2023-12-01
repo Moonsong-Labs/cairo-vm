@@ -164,8 +164,8 @@ pub fn save_packed_outputs_hint(
     _ids_data: &HashMap<String, HintReference>,
     _ap_tracking: &ApTracking,
 ) -> Result<(), HintError> {
-    let bootloader_input = exec_scopes.get("bootloader_input")?;
-    let packed_outputs = bootloader_input; // TODO: need type for bootloader_input / query its packed_outputs field
+    let bootloader_input: BootloaderInput = exec_scopes.get("bootloader_input")?;
+    let packed_outputs = bootloader_input.packed_outputs;
     exec_scopes.insert_value("packed_outputs", packed_outputs);
     Ok(())
 }
@@ -212,7 +212,6 @@ pub fn guess_pre_image_of_subtasks_output_hash_hint(
 
 #[cfg(test)]
 mod tests {
-    use crate::hint_processor::builtin_hint_processor::hint_code::BOOTLOADER_SAVE_OUTPUT_POINTER;
     use crate::hint_processor::builtin_hint_processor::hint_utils::get_maybe_relocatable_from_var_name;
     use crate::hint_processor::hint_processor_definition::HintReference;
     use crate::types::exec_scope::ExecutionScopes;
@@ -362,6 +361,8 @@ mod tests {
 
     #[test]
     fn test_save_output_pointer() {
+        use crate::hint_processor::builtin_hint_processor::hint_code::BOOTLOADER_SAVE_OUTPUT_POINTER;
+
         let mut vm = vm!();
         vm.segments = segments![((1, 0), (0, 0))];
         let mut hint_ref = HintReference::new(0, 0, true, false);
@@ -388,6 +389,52 @@ mod tests {
             output_ptr,
             Ok(x) if x == relocatable!(0, 2)
         );
+    }
+
+    #[test]
+    fn test_save_packed_ouputs() {
+        use crate::hint_processor::builtin_hint_processor::hint_code::BOOTLOADER_SAVE_PACKED_OUTPUTS;
+
+        let packed_outputs = vec![
+            PackedOutput {},
+            PackedOutput {},
+            PackedOutput {},
+        ];
+
+        let bootloader_input = BootloaderInput {
+            simple_bootloader_input: SimpleBootloaderInput { fact_topologies_path: None, single_page: false },
+            bootloader_config: BootloaderConfig {
+                simple_bootloader_program_hash: ProgramHash(42u64),
+                supported_cairo_verifier_program_hashes: Default::default(),
+            },
+            packed_outputs: packed_outputs.clone(), 
+        };
+
+        let mut vm = vm!();
+        let mut exec_scopes = ExecutionScopes::new();
+
+        exec_scopes.insert_box("bootloader_input", Box::new(bootloader_input.clone()));
+
+        let hint_data =
+            HintProcessorData::new_default(String::from(BOOTLOADER_SAVE_PACKED_OUTPUTS), HashMap::new());
+        let mut hint_processor = BuiltinHintProcessor::new_empty();
+        assert_matches!(
+            hint_processor.execute_hint(
+                &mut vm,
+                &mut exec_scopes,
+                &any_box!(hint_data),
+                &HashMap::new(),
+            ),
+            Ok(())
+        );
+
+        let saved_packed_outputs = exec_scopes.get::<Vec<PackedOutput>>("packed_outputs");
+        assert_matches!(
+            saved_packed_outputs,
+            Ok(ref x) if x == &packed_outputs
+        );
+
+        assert_eq!(saved_packed_outputs.expect("asserted Ok above, qed").len(), 3);
     }
 
 }
