@@ -212,6 +212,7 @@ pub fn guess_pre_image_of_subtasks_output_hash_hint(
 
 #[cfg(test)]
 mod tests {
+    use crate::hint_processor::builtin_hint_processor::hint_code::BOOTLOADER_SAVE_OUTPUT_POINTER;
     use crate::hint_processor::builtin_hint_processor::hint_utils::get_maybe_relocatable_from_var_name;
     use crate::hint_processor::hint_processor_definition::HintReference;
     use crate::types::exec_scope::ExecutionScopes;
@@ -219,6 +220,13 @@ mod tests {
     use crate::utils::test_utils::*;
     use crate::vm::runners::builtin_runner::BuiltinRunner;
     use crate::vm::vm_core::VirtualMachine;
+    use crate::hint_processor::builtin_hint_processor::builtin_hint_processor_definition::HintProcessorData;
+    use crate::serde::deserialize_program::OffsetValue;
+    use assert_matches::assert_matches;
+    use crate::{any_box, relocatable};
+    use crate::hint_processor::builtin_hint_processor::builtin_hint_processor_definition::BuiltinHintProcessor;
+    use crate::hint_processor::hint_processor_definition::HintProcessorLogic;
+
 
     use super::*;
 
@@ -351,4 +359,35 @@ mod tests {
             other => panic!("Expected an output builtin, found {:?}", other),
         }
     }
+
+    #[test]
+    fn test_save_output_pointer() {
+        let mut vm = vm!();
+        vm.segments = segments![((1, 0), (0, 0))];
+        let mut hint_ref = HintReference::new(0, 0, true, false);
+        hint_ref.offset2 = OffsetValue::Value(2);
+        let ids_data = HashMap::from([("output_ptr".to_string(), hint_ref)]);
+
+        let mut exec_scopes = ExecutionScopes::new();
+
+        let hint_data =
+            HintProcessorData::new_default(String::from(BOOTLOADER_SAVE_OUTPUT_POINTER), ids_data);
+        let mut hint_processor = BuiltinHintProcessor::new_empty();
+        assert_matches!(
+            hint_processor.execute_hint(
+                &mut vm,
+                &mut exec_scopes,
+                &any_box!(hint_data),
+                &HashMap::new(),
+            ),
+            Ok(())
+        );
+
+        let output_ptr = exec_scopes.get::<Relocatable>("output_start");
+        assert_matches!(
+            output_ptr,
+            Ok(x) if x == relocatable!(0, 2)
+        );
+    }
+
 }
