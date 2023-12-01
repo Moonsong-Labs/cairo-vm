@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use felt::Felt252;
 use serde::Deserialize;
 
 use crate::hint_processor::builtin_hint_processor::hint_utils::insert_value_from_var_name;
@@ -33,8 +34,9 @@ pub struct BootloaderConfig {
 }
 
 #[derive(Deserialize, Debug, Clone, PartialEq)]
-pub struct PackedOutput {
-    // TODO: missing definitions of PlainPackedOutput, CompositePackedOutput
+pub enum PackedOutput {
+    Plain(Vec<Felt252>),
+    Composite(Vec<Felt252>),
 }
 
 #[derive(Deserialize, Debug, Clone, PartialEq)]
