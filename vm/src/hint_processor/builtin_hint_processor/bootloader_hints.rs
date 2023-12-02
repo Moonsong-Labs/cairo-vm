@@ -41,6 +41,13 @@ pub struct PackedOutput {
     // TODO: missing definitions of PlainPackedOutput, CompositePackedOutput
 }
 
+impl PackedOutput {
+    // TODO: implement and define return type
+    pub fn elements_for_hash(&self) -> Vec<()> {
+        Default::default()
+    }
+}
+
 #[derive(Deserialize, Debug, Clone, PartialEq)]
 pub struct SimpleBootloaderInput {
     pub fact_topologies_path: Option<String>,
@@ -204,17 +211,22 @@ pub fn guess_pre_image_of_subtasks_output_hash_hint(
     ids_data: &HashMap<String, HintReference>,
     ap_tracking: &ApTracking,
 ) -> Result<(), HintError> {
-    let packed_outputs = exec_scopes.get::<Relocatable>("packed_outputs")?;
-    let data = packed_outputs; // TODO: need type for packed_output / call its elements_for_hash() fn
-    let data_len = 0usize; // TODO: should be length of data
-    insert_value_from_var_name("nested_subtasks_output_len", data_len, vm, ids_data, ap_tracking)?;
-    insert_value_from_var_name("nested_subtasks_output", &data, vm, ids_data, ap_tracking)?;
+    use felt::Felt252;
+
+    let packed_output = exec_scopes.get::<PackedOutput>("packed_output")?;
+    let data = packed_output.elements_for_hash();
+    insert_value_from_var_name("nested_subtasks_output_len", data.len(), vm, ids_data, ap_tracking)?;
+    // TODO: equivalent of 'segments.gen_arg'
+    insert_value_from_var_name("nested_subtasks_output", Felt252::from(42), vm, ids_data, ap_tracking)?;
     Ok(())
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::hint_processor::builtin_hint_processor::hint_utils::get_maybe_relocatable_from_var_name;
+    use crate::hint_processor::builtin_hint_processor::hint_utils::{
+        get_integer_from_var_name,
+        get_maybe_relocatable_from_var_name,
+    };
     use crate::hint_processor::hint_processor_definition::HintReference;
     use crate::types::exec_scope::ExecutionScopes;
     use crate::types::relocatable::MaybeRelocatable;
@@ -467,6 +479,51 @@ mod tests {
             packed_outputs,
             Ok(x) if x == Felt252::from(42)
         );
+    }
+
+    #[test]
+    fn test_guess_pre_image_of_subtasks_output_hash_hint() {
+        use crate::hint_processor::builtin_hint_processor::hint_code::BOOTLOADER_GUESS_PRE_IMAGE_OF_SUBTASKS_OUTPUT_HASH;
+
+        let mut vm = vm!();
+        let mut exec_scopes = ExecutionScopes::new();
+
+        exec_scopes.insert_box("packed_output", Box::new(PackedOutput {}));
+
+        let hint_data =
+            HintProcessorData::new_default(String::from(BOOTLOADER_GUESS_PRE_IMAGE_OF_SUBTASKS_OUTPUT_HASH), HashMap::new());
+        let hint_data = any_box!(hint_data);
+        let mut hint_processor = BuiltinHintProcessor::new_empty();
+        assert_matches!(
+            hint_processor.execute_hint(
+                &mut vm,
+                &mut exec_scopes,
+                &hint_data,
+                &HashMap::new(),
+            ),
+            Ok(())
+        );
+
+        let hint_data: &HintProcessorData = hint_data.downcast_ref().expect("type given above");
+        let nested_subtasks_output_len = get_integer_from_var_name(
+            "nested_subtasks_output_len",
+            &vm,
+            &hint_data.ids_data,
+            &hint_data.ap_tracking
+        )
+        .expect("nested_subtasks_output_len should be set")
+        .into_owned();
+        assert_eq!(nested_subtasks_output_len, 0.into());
+        
+        let nested_subtasks_output = get_integer_from_var_name(
+            "nested_subtasks_output",
+            &vm,
+            &hint_data.ids_data,
+            &hint_data.ap_tracking
+        )
+        .expect("nested_subtasks_output should be set")
+        .into_owned();
+        assert_eq!(nested_subtasks_output, 42.into());
     }
 
 }
