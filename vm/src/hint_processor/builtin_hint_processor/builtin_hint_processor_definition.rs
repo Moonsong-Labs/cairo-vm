@@ -1,5 +1,9 @@
 use super::{
     blake2s_utils::finalize_blake2s_v3,
+    bootloader_hints::{
+        guess_pre_image_of_subtasks_output_hash, save_output_pointer, save_packed_outputs,
+        set_packed_output_to_subtasks,
+    },
     ec_recover::{
         ec_recover_divmod_n_packed, ec_recover_product_div_m, ec_recover_product_mod,
         ec_recover_sub_a_b,
@@ -18,7 +22,7 @@ use super::{
         fq::{inv_mod_p_uint256, uint512_unsigned_div_rem},
         inv_mod_p_uint512::inv_mod_p_uint512,
         pack::*,
-    }, bootloader_hints::{save_output_pointer, save_packed_outputs, set_packed_output_to_subtasks, guess_pre_image_of_subtasks_output_hash},
+    },
 };
 use crate::hint_processor::builtin_hint_processor::bootloader_hints::{
     prepare_simple_bootloader_input, prepare_simple_bootloader_output_segment,
@@ -838,11 +842,19 @@ impl HintProcessorLogic for BuiltinHintProcessor {
                 save_packed_outputs(vm, exec_scopes, &hint_data.ids_data, &hint_data.ap_tracking)
             }
             hint_code::BOOTLOADER_GUESS_PRE_IMAGE_OF_SUBTASKS_OUTPUT_HASH => {
-                guess_pre_image_of_subtasks_output_hash(vm, exec_scopes, &hint_data.ids_data, &hint_data.ap_tracking)
+                guess_pre_image_of_subtasks_output_hash(
+                    vm,
+                    exec_scopes,
+                    &hint_data.ids_data,
+                    &hint_data.ap_tracking,
+                )
             }
-            hint_code::BOOTLOADER_SET_PACKED_OUTPUT_TO_SUBTASKS => {
-                set_packed_output_to_subtasks(vm, exec_scopes, &hint_data.ids_data, &hint_data.ap_tracking)
-            }
+            hint_code::BOOTLOADER_SET_PACKED_OUTPUT_TO_SUBTASKS => set_packed_output_to_subtasks(
+                vm,
+                exec_scopes,
+                &hint_data.ids_data,
+                &hint_data.ap_tracking,
+            ),
             #[cfg(feature = "skip_next_instruction_hint")]
             hint_code::SKIP_NEXT_INSTRUCTION => skip_next_instruction(vm),
             code => Err(HintError::UnknownHint(code.to_string().into_boxed_str())),

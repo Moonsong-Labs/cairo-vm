@@ -3,8 +3,7 @@ use std::collections::HashMap;
 use serde::Deserialize;
 
 use crate::hint_processor::builtin_hint_processor::hint_utils::{
-    get_ptr_from_var_name,
-    insert_value_from_var_name,
+    get_ptr_from_var_name, insert_value_from_var_name,
 };
 use crate::hint_processor::hint_processor_definition::HintReference;
 use crate::serde::deserialize_program::ApTracking;
@@ -215,31 +214,41 @@ pub fn guess_pre_image_of_subtasks_output_hash(
 
     let packed_output = exec_scopes.get::<PackedOutput>("packed_output")?;
     let data = packed_output.elements_for_hash();
-    insert_value_from_var_name("nested_subtasks_output_len", data.len(), vm, ids_data, ap_tracking)?;
+    insert_value_from_var_name(
+        "nested_subtasks_output_len",
+        data.len(),
+        vm,
+        ids_data,
+        ap_tracking,
+    )?;
     // TODO: equivalent of 'segments.gen_arg'
-    insert_value_from_var_name("nested_subtasks_output", Felt252::from(42), vm, ids_data, ap_tracking)?;
+    insert_value_from_var_name(
+        "nested_subtasks_output",
+        Felt252::from(42),
+        vm,
+        ids_data,
+        ap_tracking,
+    )?;
     Ok(())
 }
 
 #[cfg(test)]
 mod tests {
+    use crate::hint_processor::builtin_hint_processor::builtin_hint_processor_definition::BuiltinHintProcessor;
+    use crate::hint_processor::builtin_hint_processor::builtin_hint_processor_definition::HintProcessorData;
     use crate::hint_processor::builtin_hint_processor::hint_utils::{
-        get_integer_from_var_name,
-        get_maybe_relocatable_from_var_name,
+        get_integer_from_var_name, get_maybe_relocatable_from_var_name,
     };
+    use crate::hint_processor::hint_processor_definition::HintProcessorLogic;
     use crate::hint_processor::hint_processor_definition::HintReference;
+    use crate::serde::deserialize_program::OffsetValue;
     use crate::types::exec_scope::ExecutionScopes;
     use crate::types::relocatable::MaybeRelocatable;
     use crate::utils::test_utils::*;
     use crate::vm::runners::builtin_runner::BuiltinRunner;
     use crate::vm::vm_core::VirtualMachine;
-    use crate::hint_processor::builtin_hint_processor::builtin_hint_processor_definition::HintProcessorData;
-    use crate::serde::deserialize_program::OffsetValue;
-    use assert_matches::assert_matches;
     use crate::{any_box, relocatable};
-    use crate::hint_processor::builtin_hint_processor::builtin_hint_processor_definition::BuiltinHintProcessor;
-    use crate::hint_processor::hint_processor_definition::HintProcessorLogic;
-
+    use assert_matches::assert_matches;
 
     use super::*;
 
@@ -409,19 +418,18 @@ mod tests {
     fn test_save_packed_ouputs() {
         use crate::hint_processor::builtin_hint_processor::hint_code::BOOTLOADER_SAVE_PACKED_OUTPUTS;
 
-        let packed_outputs = vec![
-            PackedOutput {},
-            PackedOutput {},
-            PackedOutput {},
-        ];
+        let packed_outputs = vec![PackedOutput {}, PackedOutput {}, PackedOutput {}];
 
         let bootloader_input = BootloaderInput {
-            simple_bootloader_input: SimpleBootloaderInput { fact_topologies_path: None, single_page: false },
+            simple_bootloader_input: SimpleBootloaderInput {
+                fact_topologies_path: None,
+                single_page: false,
+            },
             bootloader_config: BootloaderConfig {
                 simple_bootloader_program_hash: ProgramHash(42u64),
                 supported_cairo_verifier_program_hashes: Default::default(),
             },
-            packed_outputs: packed_outputs.clone(), 
+            packed_outputs: packed_outputs.clone(),
         };
 
         let mut vm = vm!();
@@ -429,8 +437,10 @@ mod tests {
 
         exec_scopes.insert_box("bootloader_input", Box::new(bootloader_input.clone()));
 
-        let hint_data =
-            HintProcessorData::new_default(String::from(BOOTLOADER_SAVE_PACKED_OUTPUTS), HashMap::new());
+        let hint_data = HintProcessorData::new_default(
+            String::from(BOOTLOADER_SAVE_PACKED_OUTPUTS),
+            HashMap::new(),
+        );
         let mut hint_processor = BuiltinHintProcessor::new_empty();
         assert_matches!(
             hint_processor.execute_hint(
@@ -448,7 +458,10 @@ mod tests {
             Ok(ref x) if x == &packed_outputs
         );
 
-        assert_eq!(saved_packed_outputs.expect("asserted Ok above, qed").len(), 3);
+        assert_eq!(
+            saved_packed_outputs.expect("asserted Ok above, qed").len(),
+            3
+        );
     }
 
     #[test]
@@ -461,8 +474,10 @@ mod tests {
 
         exec_scopes.insert_box("packed_output", Box::new(Felt252::from(42)));
 
-        let hint_data =
-            HintProcessorData::new_default(String::from(BOOTLOADER_SET_PACKED_OUTPUT_TO_SUBTASKS), HashMap::new());
+        let hint_data = HintProcessorData::new_default(
+            String::from(BOOTLOADER_SET_PACKED_OUTPUT_TO_SUBTASKS),
+            HashMap::new(),
+        );
         let mut hint_processor = BuiltinHintProcessor::new_empty();
         assert_matches!(
             hint_processor.execute_hint(
@@ -494,17 +509,14 @@ mod tests {
 
         exec_scopes.insert_box("packed_output", Box::new(PackedOutput {}));
 
-        let hint_data =
-            HintProcessorData::new_default(String::from(BOOTLOADER_GUESS_PRE_IMAGE_OF_SUBTASKS_OUTPUT_HASH), ids_data);
+        let hint_data = HintProcessorData::new_default(
+            String::from(BOOTLOADER_GUESS_PRE_IMAGE_OF_SUBTASKS_OUTPUT_HASH),
+            ids_data,
+        );
         let hint_data = any_box!(hint_data);
         let mut hint_processor = BuiltinHintProcessor::new_empty();
         assert_matches!(
-            hint_processor.execute_hint(
-                &mut vm,
-                &mut exec_scopes,
-                &hint_data,
-                &HashMap::new(),
-            ),
+            hint_processor.execute_hint(&mut vm, &mut exec_scopes, &hint_data, &HashMap::new(),),
             Ok(())
         );
 
@@ -513,21 +525,20 @@ mod tests {
             "nested_subtasks_output_len",
             &vm,
             &hint_data.ids_data,
-            &hint_data.ap_tracking
+            &hint_data.ap_tracking,
         )
         .expect("nested_subtasks_output_len should be set")
         .into_owned();
         assert_eq!(nested_subtasks_output_len, 0.into());
-        
+
         let nested_subtasks_output = get_integer_from_var_name(
             "nested_subtasks_output",
             &vm,
             &hint_data.ids_data,
-            &hint_data.ap_tracking
+            &hint_data.ap_tracking,
         )
         .expect("nested_subtasks_output should be set")
         .into_owned();
         assert_eq!(nested_subtasks_output, 42.into());
     }
-
 }

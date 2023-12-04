@@ -1427,11 +1427,9 @@ pub const BOOTLOADER_RESTORE_BOOTLOADER_OUTPUT: &str =
     "# Restore the bootloader's output builtin state.
 output_builtin.set_state(output_builtin_state)";
 
-pub const BOOTLOADER_SAVE_OUTPUT_POINTER: &str =
-    "output_start = ids.output_ptr";
+pub const BOOTLOADER_SAVE_OUTPUT_POINTER: &str = "output_start = ids.output_ptr";
 
-pub const BOOTLOADER_SAVE_PACKED_OUTPUTS: &str =
-    "packed_outputs = bootloader_input.packed_outputs";
+pub const BOOTLOADER_SAVE_PACKED_OUTPUTS: &str = "packed_outputs = bootloader_input.packed_outputs";
 
 pub const BOOTLOADER_GUESS_PRE_IMAGE_OF_SUBTASKS_OUTPUT_HASH: &str =
     "data = packed_output.elements_for_hash()
