@@ -495,7 +495,7 @@ mod tests {
         exec_scopes.insert_box("packed_output", Box::new(PackedOutput {}));
 
         let hint_data =
-            HintProcessorData::new_default(String::from(BOOTLOADER_GUESS_PRE_IMAGE_OF_SUBTASKS_OUTPUT_HASH), HashMap::new());
+            HintProcessorData::new_default(String::from(BOOTLOADER_GUESS_PRE_IMAGE_OF_SUBTASKS_OUTPUT_HASH), ids_data);
         let hint_data = any_box!(hint_data);
         let mut hint_processor = BuiltinHintProcessor::new_empty();
         assert_matches!(
