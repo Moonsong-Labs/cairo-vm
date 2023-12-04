@@ -27,6 +27,7 @@ use super::{
         pack::*,
     },
 };
+use crate::hint_processor::builtin_hint_processor::bootloader::simple_bootloader_hints::prepare_task_range_checks;
 use crate::{
     hint_processor::{
         builtin_hint_processor::secp::ec_utils::{
@@ -863,6 +864,12 @@ impl HintProcessorLogic for BuiltinHintProcessor {
             hint_code::BOOTLOADER_ASSERT_IS_COMPOSITE_PACKED_OUTPUT => {
                 assert_is_composite_packed_output(exec_scopes)
             }
+            hint_code::SIMPLE_BOOTLOADER_PREPARE_TASK_RANGE_CHECKS => prepare_task_range_checks(
+                vm,
+                exec_scopes,
+                &hint_data.ids_data,
+                &hint_data.ap_tracking,
+            ),
             hint_code::EXECUTE_TASK_ASSERT_PROGRAM_ADDRESS => {
                 assert_program_address(vm, exec_scopes, &hint_data.ids_data, &hint_data.ap_tracking)
             }

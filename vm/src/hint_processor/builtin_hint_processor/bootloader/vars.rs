@@ -13,5 +13,8 @@ pub(crate) const PACKED_OUTPUTS: &str = "packed_outputs";
 /// Packed output for the current task.
 pub(crate) const PACKED_OUTPUT: &str = "packed_output";
 
+/// Fact topologies.
+pub(crate) const FACT_TOPOLOGIES: &str = "fact_topologies";
+
 /// Address of current program.
 pub(crate) const PROGRAM_ADDRESS: &str = "program_address";
