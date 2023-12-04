@@ -16,5 +16,8 @@ pub(crate) const PACKED_OUTPUT: &str = "packed_output";
 /// Fact topologies.
 pub(crate) const FACT_TOPOLOGIES: &str = "fact_topologies";
 
+/// Program data segment. Used in `execute_task()`.
+pub(crate) const PROGRAM_DATA_BASE: &str = "program_data_base";
+
 /// Address of current program.
 pub(crate) const PROGRAM_ADDRESS: &str = "program_address";
