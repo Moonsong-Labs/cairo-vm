@@ -16,6 +16,9 @@ pub(crate) const PACKED_OUTPUT: &str = "packed_output";
 /// Fact topologies.
 pub(crate) const FACT_TOPOLOGIES: &str = "fact_topologies";
 
+/// Simple bootloader tasks.
+pub(crate) const TASKS: &str = "tasks";
+
 /// Program data segment. Used in `execute_task()`.
 pub(crate) const PROGRAM_DATA_BASE: &str = "program_data_base";
 

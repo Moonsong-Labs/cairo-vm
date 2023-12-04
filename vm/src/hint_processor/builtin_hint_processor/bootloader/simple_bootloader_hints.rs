@@ -61,6 +61,15 @@ pub fn prepare_task_range_checks(
     Ok(())
 }
 
+/// Implements
+/// %{ tasks = simple_bootloader_input.tasks %}
+pub fn set_tasks_variable(exec_scopes: &mut ExecutionScopes) -> Result<(), HintError> {
+    let simple_bootloader_input: SimpleBootloaderInput =
+        exec_scopes.get(vars::SIMPLE_BOOTLOADER_INPUT)?;
+    exec_scopes.insert_value(vars::TASKS, simple_bootloader_input.tasks);
+
+    Ok(())
+}
 #[cfg(test)]
 mod tests {
     use num_traits::ToPrimitive;
@@ -68,7 +77,9 @@ mod tests {
 
     use rstest::{fixture, rstest};
 
-    use crate::hint_processor::builtin_hint_processor::bootloader::simple_bootloader_hints::prepare_task_range_checks;
+    use crate::hint_processor::builtin_hint_processor::bootloader::simple_bootloader_hints::{
+        prepare_task_range_checks, set_tasks_variable,
+    };
     use crate::hint_processor::builtin_hint_processor::bootloader::types::{
         FactTopology, SimpleBootloaderInput, Task,
     };
@@ -139,5 +150,20 @@ mod tests {
             .get(vars::FACT_TOPOLOGIES)
             .expect("Fact topologies missing from scope");
         assert!(fact_topologies.is_empty());
+    }
+
+    #[rstest]
+    fn test_set_tasks_variable(simple_bootloader_input: SimpleBootloaderInput) {
+        let bootloader_tasks = simple_bootloader_input.tasks.clone();
+
+        let mut exec_scopes = ExecutionScopes::new();
+        exec_scopes.insert_value(vars::SIMPLE_BOOTLOADER_INPUT, simple_bootloader_input);
+
+        set_tasks_variable(&mut exec_scopes).expect("Hint failed unexpectedly");
+
+        let tasks: Vec<Task> = exec_scopes
+            .get(vars::TASKS)
+            .expect("Tasks variable is not set");
+        assert_eq!(tasks, bootloader_tasks);
     }
 }
