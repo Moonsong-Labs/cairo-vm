@@ -6,7 +6,8 @@ use num_traits::ToPrimitive;
 use serde::Deserialize;
 
 use crate::hint_processor::builtin_hint_processor::hint_utils::{
-    get_integer_from_var_name, get_ptr_from_var_name, insert_value_from_var_name, insert_value_into_ap,
+    get_integer_from_var_name, get_ptr_from_var_name, insert_value_from_var_name,
+    insert_value_into_ap,
 };
 use crate::hint_processor::hint_processor_definition::HintReference;
 use crate::serde::deserialize_program::ApTracking;
@@ -282,6 +283,21 @@ pub fn is_plain_packed_output(
     insert_value_into_ap(vm, result)?;
 
     Ok(())
+}
+
+/// Implements
+/// %{ assert isinstance(packed_output, CompositePackedOutput) %}
+pub fn assert_is_composite_packed_output(
+    exec_scopes: &mut ExecutionScopes,
+) -> Result<(), HintError> {
+    let packed_output: PackedOutput = exec_scopes.get(vars::PACKED_OUTPUT)?;
+
+    match packed_output {
+        PackedOutput::Composite(_) => Ok(()),
+        other => Err(HintError::CustomHint(
+            format!("Expected composite packed output, got {:?}", other).into_boxed_str(),
+        )),
+    }
 }
 
 /*
@@ -838,5 +854,21 @@ mod tests {
                 .expect("nested_subtasks_output should be set")
                 .into_owned();
         assert_eq!(nested_subtasks_output, 42.into());
+    }
+
+    #[rstest]
+    fn test_assert_is_composite_packed_output() {
+        let mut exec_scopes = ExecutionScopes::new();
+
+        let plain_packed_output = PackedOutput::Plain(Vec::<Felt252>::new());
+        exec_scopes.insert_value(vars::PACKED_OUTPUT, plain_packed_output);
+        assert!(matches!(
+            assert_is_composite_packed_output(&mut exec_scopes),
+            Err(HintError::CustomHint(_))
+        ));
+
+        let composite_packed_output = PackedOutput::Composite(Vec::<Felt252>::new());
+        exec_scopes.insert_value(vars::PACKED_OUTPUT, composite_packed_output);
+        assert!(assert_is_composite_packed_output(&mut exec_scopes).is_ok());
     }
 }

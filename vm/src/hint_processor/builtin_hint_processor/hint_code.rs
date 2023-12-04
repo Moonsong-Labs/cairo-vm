@@ -1467,3 +1467,6 @@ ids.nested_subtasks_output = segments.gen_arg(data)";
 
 pub const BOOTLOADER_SET_PACKED_OUTPUT_TO_SUBTASKS: &str =
     "packed_outputs = packed_output.subtasks";
+
+pub const BOOTLOADER_ASSERT_IS_COMPOSITE_PACKED_OUTPUT: &str =
+    "assert isinstance(packed_output, CompositePackedOutput)";
