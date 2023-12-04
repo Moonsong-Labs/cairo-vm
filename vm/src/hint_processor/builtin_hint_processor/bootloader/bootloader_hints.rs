@@ -369,7 +369,7 @@ mod tests {
     use std::ops::Add;
 
     use crate::hint_processor::builtin_hint_processor::bootloader::types::{
-        BootloaderConfig, SimpleBootloaderInput, Task,
+        BootloaderConfig, SimpleBootloaderInput,
     };
     use felt::Felt252;
     use num_traits::ToPrimitive;
@@ -394,7 +394,7 @@ mod tests {
             simple_bootloader_input: SimpleBootloaderInput {
                 fact_topologies_path: None,
                 single_page: false,
-                tasks: Vec::<Task>::new(),
+                tasks: vec![],
             },
             bootloader_config: BootloaderConfig {
                 simple_bootloader_program_hash: Felt252::new(1234),

@@ -27,10 +27,21 @@ pub struct FactTopology {}
 pub struct Task {}
 
 #[derive(Deserialize, Debug, Clone, PartialEq)]
+pub struct TaskSpec {
+    pub task: Task,
+}
+
+impl TaskSpec {
+    pub fn load_task(&self) -> &Task {
+        &self.task
+    }
+}
+
+#[derive(Deserialize, Debug, Clone, PartialEq)]
 pub struct SimpleBootloaderInput {
     pub fact_topologies_path: Option<String>,
     pub single_page: bool,
-    pub tasks: Vec<Task>,
+    pub tasks: Vec<TaskSpec>,
 }
 
 #[derive(Deserialize, Debug, Clone, PartialEq)]

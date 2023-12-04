@@ -19,6 +19,9 @@ pub(crate) const FACT_TOPOLOGIES: &str = "fact_topologies";
 /// Simple bootloader tasks.
 pub(crate) const TASKS: &str = "tasks";
 
+/// Current simple bootloader task.
+pub(crate) const TASK: &str = "task";
+
 /// Program data segment. Used in `execute_task()`.
 pub(crate) const PROGRAM_DATA_BASE: &str = "program_data_base";
 

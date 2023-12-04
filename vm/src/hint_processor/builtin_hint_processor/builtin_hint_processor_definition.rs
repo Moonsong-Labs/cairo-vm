@@ -29,7 +29,8 @@ use super::{
 };
 use crate::hint_processor::builtin_hint_processor::bootloader::execute_task_hints::allocate_program_data_segment;
 use crate::hint_processor::builtin_hint_processor::bootloader::simple_bootloader_hints::{
-    divide_num_by_2, prepare_task_range_checks, set_ap_to_zero, set_tasks_variable,
+    divide_num_by_2, prepare_task_range_checks, set_ap_to_zero, set_current_task,
+    set_tasks_variable,
 };
 use crate::{
     hint_processor::{
@@ -886,6 +887,9 @@ impl HintProcessorLogic for BuiltinHintProcessor {
             ),
             hint_code::EXECUTE_TASK_ASSERT_PROGRAM_ADDRESS => {
                 assert_program_address(vm, exec_scopes, &hint_data.ids_data, &hint_data.ap_tracking)
+            }
+            hint_code::SIMPLE_BOOTLOADER_SET_CURRENT_TASK => {
+                set_current_task(vm, exec_scopes, &hint_data.ids_data, &hint_data.ap_tracking)
             }
             #[cfg(feature = "skip_next_instruction_hint")]
             hint_code::SKIP_NEXT_INSTRUCTION => skip_next_instruction(vm),

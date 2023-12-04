@@ -1,4 +1,5 @@
 use num_integer::Integer;
+use num_traits::ToPrimitive;
 use std::collections::HashMap;
 
 use felt::Felt252;
@@ -13,6 +14,7 @@ use crate::hint_processor::builtin_hint_processor::hint_utils::{
 };
 use crate::hint_processor::hint_processor_definition::HintReference;
 use crate::serde::deserialize_program::ApTracking;
+use crate::types::errors::math_errors::MathError;
 use crate::types::exec_scope::ExecutionScopes;
 use crate::vm::errors::hint_errors::HintError;
 use crate::vm::vm_core::VirtualMachine;
@@ -97,6 +99,36 @@ pub fn set_ap_to_zero(vm: &mut VirtualMachine) -> Result<(), HintError> {
     Ok(())
 }
 
+/// Implements
+/// from starkware.cairo.bootloaders.simple_bootloader.objects import Task
+///
+/// # Pass current task to execute_task.
+/// task_id = len(simple_bootloader_input.tasks) - ids.n_tasks
+/// task = simple_bootloader_input.tasks[task_id].load_task()
+pub fn set_current_task(
+    vm: &mut VirtualMachine,
+    exec_scopes: &mut ExecutionScopes,
+    ids_data: &HashMap<String, HintReference>,
+    ap_tracking: &ApTracking,
+) -> Result<(), HintError> {
+    let simple_bootloader_input: SimpleBootloaderInput =
+        exec_scopes.get(vars::SIMPLE_BOOTLOADER_INPUT)?;
+    let n_tasks_felt =
+        get_integer_from_var_name("n_tasks", vm, ids_data, ap_tracking)?.into_owned();
+    let n_tasks = n_tasks_felt
+        .to_usize()
+        .ok_or(MathError::Felt252ToUsizeConversion(Box::new(n_tasks_felt)))?;
+
+    let task_id = simple_bootloader_input.tasks.len() - n_tasks;
+    // TODO: it's still unclear how we need to model TaskSpec/Task objects.
+    //       Check if we need to keep TaskSpec, or if it needs to be implemented as a trait, etc.
+    let task = simple_bootloader_input.tasks[task_id].load_task();
+
+    exec_scopes.insert_value(vars::TASK, task.clone());
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use num_traits::ToPrimitive;
@@ -106,10 +138,11 @@ mod tests {
     use rstest::{fixture, rstest};
 
     use crate::hint_processor::builtin_hint_processor::bootloader::simple_bootloader_hints::{
-        divide_num_by_2, prepare_task_range_checks, set_ap_to_zero, set_tasks_variable,
+        divide_num_by_2, prepare_task_range_checks, set_ap_to_zero, set_current_task,
+        set_tasks_variable,
     };
     use crate::hint_processor::builtin_hint_processor::bootloader::types::{
-        FactTopology, SimpleBootloaderInput, Task,
+        FactTopology, SimpleBootloaderInput, Task, TaskSpec,
     };
     use crate::hint_processor::builtin_hint_processor::bootloader::vars;
     use crate::hint_processor::builtin_hint_processor::hint_utils::{
@@ -127,7 +160,7 @@ mod tests {
         SimpleBootloaderInput {
             fact_topologies_path: None,
             single_page: false,
-            tasks: vec![Task {}, Task {}],
+            tasks: vec![TaskSpec { task: Task {} }, TaskSpec { task: Task {} }],
         }
     }
 
@@ -191,7 +224,7 @@ mod tests {
 
         set_tasks_variable(&mut exec_scopes).expect("Hint failed unexpectedly");
 
-        let tasks: Vec<Task> = exec_scopes
+        let tasks: Vec<TaskSpec> = exec_scopes
             .get(vars::TASKS)
             .expect("Tasks variable is not set");
         assert_eq!(tasks, bootloader_tasks);
@@ -239,5 +272,27 @@ mod tests {
             .into_owned();
 
         assert_eq!(ap_value, Felt252::from(0));
+    }
+
+    #[rstest]
+    fn test_set_current_task(simple_bootloader_input: SimpleBootloaderInput) {
+        // Set n_tasks to 1
+        let mut vm = vm!();
+        vm.run_context.fp = 2;
+        vm.segments = segments![((1, 0), 1)];
+
+        let mut exec_scopes = ExecutionScopes::new();
+        exec_scopes.insert_value(vars::SIMPLE_BOOTLOADER_INPUT, simple_bootloader_input);
+
+        let ids_data = ids_data!["n_tasks", "task"];
+        let ap_tracking = ApTracking::new();
+
+        set_current_task(&mut vm, &mut exec_scopes, &ids_data, &ap_tracking)
+            .expect("Hint failed unexpectedly");
+
+        // Check that `task` is set
+        let _task: Task = exec_scopes
+            .get(vars::TASK)
+            .expect("task variable is not set.");
     }
 }
