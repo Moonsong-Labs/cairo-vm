@@ -148,7 +148,7 @@ Implements hint:
     output_start = ids.output_ptr
 %}
 */
-pub fn save_output_pointer_hint(
+pub fn save_output_pointer(
     vm: &mut VirtualMachine,
     exec_scopes: &mut ExecutionScopes,
     ids_data: &HashMap<String, HintReference>,
@@ -165,7 +165,7 @@ Implements hint:
     packed_outputs = bootloader_input.packed_outputs
 %}
 */
-pub fn save_packed_outputs_hint(
+pub fn save_packed_outputs(
     _vm: &mut VirtualMachine,
     exec_scopes: &mut ExecutionScopes,
     _ids_data: &HashMap<String, HintReference>,
@@ -183,7 +183,7 @@ Implements hint:
     packed_outputs = packed_output.subtasks
 %}
 */
-pub fn set_packed_output_to_subtasks_hint(
+pub fn set_packed_output_to_subtasks(
     _vm: &mut VirtualMachine,
     exec_scopes: &mut ExecutionScopes,
     _ids_data: &HashMap<String, HintReference>,
@@ -205,7 +205,7 @@ Implements hint:
     ids.nested_subtasks_output = segments.gen_arg(data)";
 %}
 */
-pub fn guess_pre_image_of_subtasks_output_hash_hint(
+pub fn guess_pre_image_of_subtasks_output_hash(
     vm: &mut VirtualMachine,
     exec_scopes: &mut ExecutionScopes,
     ids_data: &HashMap<String, HintReference>,
@@ -452,7 +452,7 @@ mod tests {
     }
 
     #[test]
-    fn test_set_packed_output_to_subtasks_hint() {
+    fn test_set_packed_output_to_subtasks() {
         use crate::hint_processor::builtin_hint_processor::hint_code::BOOTLOADER_SET_PACKED_OUTPUT_TO_SUBTASKS;
         use felt::Felt252;
 
@@ -482,7 +482,7 @@ mod tests {
     }
 
     #[test]
-    fn test_guess_pre_image_of_subtasks_output_hash_hint() {
+    fn test_guess_pre_image_of_subtasks_output_hash() {
         use crate::hint_processor::builtin_hint_processor::hint_code::BOOTLOADER_GUESS_PRE_IMAGE_OF_SUBTASKS_OUTPUT_HASH;
 
         let mut vm = vm!();
