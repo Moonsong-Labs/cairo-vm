@@ -1,9 +1,9 @@
 use std::any::Any;
 use std::collections::HashMap;
 
+use felt::Felt252;
 use num_traits::ToPrimitive;
 use serde::Deserialize;
-use felt::Felt252;
 
 use crate::hint_processor::builtin_hint_processor::hint_utils::{
     get_integer_from_var_name, get_ptr_from_var_name, insert_value_from_var_name,
@@ -367,9 +367,7 @@ mod tests {
     use num_traits::ToPrimitive;
     use rstest::{fixture, rstest};
 
-    use crate::hint_processor::builtin_hint_processor::hint_utils::{
-        get_ptr_from_var_name,
-    };
+    use crate::hint_processor::builtin_hint_processor::hint_utils::get_ptr_from_var_name;
     use crate::hint_processor::hint_processor_definition::HintReference;
     use crate::serde::deserialize_program::OffsetValue;
     use crate::types::exec_scope::ExecutionScopes;
@@ -773,7 +771,10 @@ mod tests {
 
         let mut exec_scopes = ExecutionScopes::new();
 
-        exec_scopes.insert_box("packed_output", Box::new(PackedOutput::Plain(Default::default())));
+        exec_scopes.insert_box(
+            "packed_output",
+            Box::new(PackedOutput::Plain(Default::default())),
+        );
 
         let hint_data = HintProcessorData::new_default(
             String::from(BOOTLOADER_GUESS_PRE_IMAGE_OF_SUBTASKS_OUTPUT_HASH),
