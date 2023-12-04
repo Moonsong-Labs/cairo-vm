@@ -28,7 +28,9 @@ use super::{
     },
 };
 use crate::hint_processor::builtin_hint_processor::bootloader::execute_task_hints::allocate_program_data_segment;
-use crate::hint_processor::builtin_hint_processor::bootloader::simple_bootloader_hints::prepare_task_range_checks;
+use crate::hint_processor::builtin_hint_processor::bootloader::simple_bootloader_hints::{
+    divide_num_by_2, prepare_task_range_checks,
+};
 use crate::{
     hint_processor::{
         builtin_hint_processor::secp::ec_utils::{
@@ -871,6 +873,9 @@ impl HintProcessorLogic for BuiltinHintProcessor {
                 &hint_data.ids_data,
                 &hint_data.ap_tracking,
             ),
+            hint_code::SIMPLE_BOOTLOADER_DIVIDE_NUM_BY_2 => {
+                divide_num_by_2(vm, &hint_data.ids_data, &hint_data.ap_tracking)
+            }
             hint_code::EXECUTE_TASK_ALLOCATE_PROGRAM_DATA_SEGMENT => allocate_program_data_segment(
                 vm,
                 exec_scopes,

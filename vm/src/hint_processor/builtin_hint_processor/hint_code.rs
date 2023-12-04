@@ -1485,7 +1485,7 @@ fact_topologies = []";
 
 pub const SIMPLE_BOOTLOADER_SET_TASKS_VARIABLE: &str = "tasks = simple_bootloader_input.tasks";
 
-pub const SIMPLE_BOOTLOADER_DIVIDE_NUMS_BY_2: &str = "ids.num // 2";
+pub const SIMPLE_BOOTLOADER_DIVIDE_NUM_BY_2: &str = "ids.num // 2";
 
 pub const SIMPLE_BOOTLOADER_SET_CURRENT_TASK: &str =
     "from starkware.cairo.bootloaders.simple_bootloader.objects import Task
