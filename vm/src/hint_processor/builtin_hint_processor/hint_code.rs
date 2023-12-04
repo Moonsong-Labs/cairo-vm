@@ -1453,6 +1453,9 @@ pub const BOOTLOADER_IMPORT_PACKED_OUTPUT_SCHEMAS: &str =
     CompositePackedOutput,
     PlainPackedOutput,
 )";
+
+pub const BOOTLOADER_IS_PLAIN_PACKED_OUTPUT: &str = "isinstance(packed_output, PlainPackedOutput)";
+
 pub const BOOTLOADER_SAVE_OUTPUT_POINTER: &str = "output_start = ids.output_ptr";
 
 pub const BOOTLOADER_SAVE_PACKED_OUTPUTS: &str = "packed_outputs = bootloader_input.packed_outputs";

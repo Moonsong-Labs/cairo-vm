@@ -6,7 +6,7 @@ use num_traits::ToPrimitive;
 use serde::Deserialize;
 
 use crate::hint_processor::builtin_hint_processor::hint_utils::{
-    get_integer_from_var_name, get_ptr_from_var_name, insert_value_from_var_name,
+    get_integer_from_var_name, get_ptr_from_var_name, insert_value_from_var_name, insert_value_into_ap,
 };
 use crate::hint_processor::hint_processor_definition::HintReference;
 use crate::serde::deserialize_program::ApTracking;
@@ -264,6 +264,23 @@ pub fn enter_packed_output_scope(
 /// )
 pub fn import_packed_output_schemas() -> Result<(), HintError> {
     // Nothing to do!
+    Ok(())
+}
+
+/// Implements %{ isinstance(packed_output, PlainPackedOutput) %}
+///
+/// Stores the result in the `ap` register to be accessed by the program.
+pub fn is_plain_packed_output(
+    vm: &mut VirtualMachine,
+    exec_scopes: &mut ExecutionScopes,
+) -> Result<(), HintError> {
+    let packed_output: PackedOutput = exec_scopes.get(vars::PACKED_OUTPUT)?;
+    let result = match packed_output {
+        PackedOutput::Plain(_) => 1,
+        _ => 0,
+    };
+    insert_value_into_ap(vm, result)?;
+
     Ok(())
 }
 
@@ -630,6 +647,43 @@ mod tests {
             .expect("PACKED_OUTPUT not present in scope");
 
         assert!(matches!(packed_output, PackedOutput::Composite(_)));
+    }
+
+    #[test]
+    fn test_is_plain_packed_output() {
+        let mut vm = vm!();
+        add_segments!(vm, 2);
+
+        let mut exec_scopes = ExecutionScopes::new();
+
+        fn is_plain(
+            vm: &mut VirtualMachine,
+            exec_scopes: &mut ExecutionScopes,
+            packed_output: PackedOutput,
+        ) -> bool {
+            exec_scopes.insert_value(vars::PACKED_OUTPUT, packed_output);
+            is_plain_packed_output(vm, exec_scopes).expect("Hint failed unexpectedly");
+            let result = vm
+                .segments
+                .memory
+                .get_integer(vm.run_context.get_ap())
+                .unwrap();
+
+            result.into_owned() != Felt252::from(0)
+        }
+
+        let plain_packed_output = PackedOutput::Plain(Vec::<Felt252>::new());
+        let composite_packed_output = PackedOutput::Composite(Vec::<Felt252>::new());
+
+        assert!(is_plain(&mut vm, &mut exec_scopes, plain_packed_output));
+
+        // Increment AP to avoid an inconsistent memory error writing in the same slot
+        vm.run_context.ap += 1;
+        assert!(!is_plain(
+            &mut vm,
+            &mut exec_scopes,
+            composite_packed_output
+        ));
     }
 
     #[test]
