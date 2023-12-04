@@ -1423,10 +1423,36 @@ output_builtin.new_state(base=ids.simple_bootloader_output_start)";
 
 pub const BOOTLOADER_PREPARE_SIMPLE_BOOTLOADER_INPUT: &str =
     "simple_bootloader_input = bootloader_input";
+
 pub const BOOTLOADER_RESTORE_BOOTLOADER_OUTPUT: &str =
     "# Restore the bootloader's output builtin state.
 output_builtin.set_state(output_builtin_state)";
 
+pub const BOOTLOADER_LOAD_BOOTLOADER_CONFIG: &str =
+    "from starkware.cairo.bootloaders.bootloader.objects import BootloaderConfig
+bootloader_config: BootloaderConfig = bootloader_input.bootloader_config
+
+ids.bootloader_config = segments.gen_arg(
+    [
+        bootloader_config.simple_bootloader_program_hash,
+        len(bootloader_config.supported_cairo_verifier_program_hashes),
+        bootloader_config.supported_cairo_verifier_program_hashes,
+    ],
+)";
+
+pub const BOOTLOADER_ENTER_PACKED_OUTPUT_SCOPE: &str =
+    "from starkware.cairo.bootloaders.bootloader.objects import PackedOutput
+
+task_id = len(packed_outputs) - ids.n_subtasks
+packed_output: PackedOutput = packed_outputs[task_id]
+
+vm_enter_scope(new_scope_locals=dict(packed_output=packed_output))";
+
+pub const BOOTLOADER_IMPORT_PACKED_OUTPUT_SCHEMAS: &str =
+    "from starkware.cairo.bootloaders.bootloader.objects import (
+    CompositePackedOutput,
+    PlainPackedOutput,
+)";
 pub const BOOTLOADER_SAVE_OUTPUT_POINTER: &str = "output_start = ids.output_ptr";
 
 pub const BOOTLOADER_SAVE_PACKED_OUTPUTS: &str = "packed_outputs = bootloader_input.packed_outputs";
