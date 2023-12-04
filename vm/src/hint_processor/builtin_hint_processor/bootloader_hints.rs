@@ -368,7 +368,7 @@ mod tests {
     use rstest::{fixture, rstest};
 
     use crate::hint_processor::builtin_hint_processor::hint_utils::{
-        get_maybe_relocatable_from_var_name, get_ptr_from_var_name,
+        get_ptr_from_var_name,
     };
     use crate::hint_processor::hint_processor_definition::HintReference;
     use crate::serde::deserialize_program::OffsetValue;
@@ -679,7 +679,11 @@ mod tests {
     fn test_save_packed_ouputs() {
         use crate::hint_processor::builtin_hint_processor::hint_code::BOOTLOADER_SAVE_PACKED_OUTPUTS;
 
-        let packed_outputs = vec![PackedOutput {}, PackedOutput {}, PackedOutput {}];
+        let packed_outputs = vec![
+            PackedOutput::Plain(Default::default()),
+            PackedOutput::Plain(Default::default()),
+            PackedOutput::Plain(Default::default()),
+        ];
 
         let bootloader_input = BootloaderInput {
             simple_bootloader_input: SimpleBootloaderInput {
@@ -687,7 +691,7 @@ mod tests {
                 single_page: false,
             },
             bootloader_config: BootloaderConfig {
-                simple_bootloader_program_hash: ProgramHash(42u64),
+                simple_bootloader_program_hash: 42u64.into(),
                 supported_cairo_verifier_program_hashes: Default::default(),
             },
             packed_outputs: packed_outputs.clone(),
@@ -760,11 +764,16 @@ mod tests {
     #[test]
     fn test_guess_pre_image_of_subtasks_output_hash() {
         use crate::hint_processor::builtin_hint_processor::hint_code::BOOTLOADER_GUESS_PRE_IMAGE_OF_SUBTASKS_OUTPUT_HASH;
+
+        let mut vm = vm!();
+        add_segments!(vm, 2);
+        vm.run_context.fp = 2;
+
         let ids_data = ids_data!["nested_subtasks_output_len", "nested_subtasks_output"];
 
         let mut exec_scopes = ExecutionScopes::new();
 
-        exec_scopes.insert_box("packed_output", Box::new(PackedOutput {}));
+        exec_scopes.insert_box("packed_output", Box::new(PackedOutput::Plain(Default::default())));
 
         let hint_data = HintProcessorData::new_default(
             String::from(BOOTLOADER_GUESS_PRE_IMAGE_OF_SUBTASKS_OUTPUT_HASH),
