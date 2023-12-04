@@ -494,12 +494,19 @@ mod tests {
 
         exec_scopes.insert_box("packed_output", Box::new(PackedOutput {}));
 
-            run_hint!(
-                vm,
-                ids_data,
-                hint_code::BOOTLOADER_GUESS_PRE_IMAGE_OF_SUBTASKS_OUTPUT_HASH,
-                &mut exec_scopes
-            )
+        let hint_data =
+            HintProcessorData::new_default(String::from(BOOTLOADER_GUESS_PRE_IMAGE_OF_SUBTASKS_OUTPUT_HASH), HashMap::new());
+        let hint_data = any_box!(hint_data);
+        let mut hint_processor = BuiltinHintProcessor::new_empty();
+        assert_matches!(
+            hint_processor.execute_hint(
+                &mut vm,
+                &mut exec_scopes,
+                &hint_data,
+                &HashMap::new(),
+            ),
+            Ok(())
+        );
 
         let hint_data: &HintProcessorData = hint_data.downcast_ref().expect("type given above");
         let nested_subtasks_output_len = get_integer_from_var_name(
