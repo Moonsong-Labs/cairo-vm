@@ -88,6 +88,15 @@ pub fn divide_num_by_2(
     Ok(())
 }
 
+/// Implements %{ 0 %}.
+///
+/// Stores 0 in the AP and returns.
+/// Used as `tempvar use_poseidon = nondet %{ 0 %}`.
+pub fn set_ap_to_zero(vm: &mut VirtualMachine) -> Result<(), HintError> {
+    insert_value_into_ap(vm, Felt252::from(0))?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use num_traits::ToPrimitive;
@@ -97,7 +106,7 @@ mod tests {
     use rstest::{fixture, rstest};
 
     use crate::hint_processor::builtin_hint_processor::bootloader::simple_bootloader_hints::{
-        divide_num_by_2, prepare_task_range_checks, set_tasks_variable,
+        divide_num_by_2, prepare_task_range_checks, set_ap_to_zero, set_tasks_variable,
     };
     use crate::hint_processor::builtin_hint_processor::bootloader::types::{
         FactTopology, SimpleBootloaderInput, Task,
@@ -213,5 +222,22 @@ mod tests {
             .get_integer(vm.run_context.get_ap())
             .unwrap();
         assert_eq!(divided_num.into_owned(), expected_num_felt);
+    }
+
+    #[rstest]
+    fn test_set_to_zero() {
+        let mut vm = vm!();
+        add_segments!(vm, 2);
+
+        set_ap_to_zero(&mut vm).expect("Hint failed unexpectedly");
+
+        let ap_value = vm
+            .segments
+            .memory
+            .get_integer(vm.run_context.get_ap())
+            .unwrap()
+            .into_owned();
+
+        assert_eq!(ap_value, Felt252::from(0));
     }
 }
