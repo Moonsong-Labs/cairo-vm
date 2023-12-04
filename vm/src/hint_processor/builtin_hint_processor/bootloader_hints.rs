@@ -772,38 +772,27 @@ mod tests {
             Box::new(PackedOutput::Plain(Default::default())),
         );
 
-        let hint_data = HintProcessorData::new_default(
-            String::from(hint_code::BOOTLOADER_GUESS_PRE_IMAGE_OF_SUBTASKS_OUTPUT_HASH),
-            ids_data.clone(),
-        );
+        let ap_tracking = ApTracking::new();
 
         assert_matches!(
             run_hint!(
                 vm,
-                ids_data,
+                ids_data.clone(),
                 hint_code::BOOTLOADER_GUESS_PRE_IMAGE_OF_SUBTASKS_OUTPUT_HASH,
                 &mut exec_scopes
             ),
             Ok(())
         );
-        let nested_subtasks_output_len = get_integer_from_var_name(
-            "nested_subtasks_output_len",
-            &vm,
-            &hint_data.ids_data,
-            &hint_data.ap_tracking,
-        )
-        .expect("nested_subtasks_output_len should be set")
-        .into_owned();
+        let nested_subtasks_output_len =
+            get_integer_from_var_name("nested_subtasks_output_len", &vm, &ids_data, &ap_tracking)
+                .expect("nested_subtasks_output_len should be set")
+                .into_owned();
         assert_eq!(nested_subtasks_output_len, 0.into());
 
-        let nested_subtasks_output = get_integer_from_var_name(
-            "nested_subtasks_output",
-            &vm,
-            &hint_data.ids_data,
-            &hint_data.ap_tracking,
-        )
-        .expect("nested_subtasks_output should be set")
-        .into_owned();
+        let nested_subtasks_output =
+            get_integer_from_var_name("nested_subtasks_output", &vm, &ids_data, &ap_tracking)
+                .expect("nested_subtasks_output should be set")
+                .into_owned();
         assert_eq!(nested_subtasks_output, 42.into());
     }
 }
