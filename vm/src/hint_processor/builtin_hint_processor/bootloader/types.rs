@@ -1,7 +1,9 @@
+use std::path::Path;
+use std::path::PathBuf;
+
 use serde::{de, Deserialize, Deserializer};
 
 use felt::Felt252;
-use std::path::PathBuf;
 
 use crate::serde::deserialize_program::deserialize_and_parse_program;
 use crate::types::program::Program;
@@ -55,6 +57,13 @@ pub struct TaskSpec {
 impl TaskSpec {
     pub fn load_task(&self) -> &Task {
         &self.task
+    }
+}
+
+impl Task {
+    pub fn get_program(&self) -> Program {
+        // TODO: implement this method correctly
+        Program::from_file(Path::new("../cairo_programs/fibonacci.json"), Some("main")).unwrap()
     }
 }
 

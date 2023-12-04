@@ -4,6 +4,11 @@ use crate::hint_processor::builtin_hint_processor::bootloader::fact_topologies::
 use num_traits::ToPrimitive;
 use std::collections::HashMap;
 
+use starknet_crypto::FieldElement;
+
+use felt::Felt252;
+
+use crate::hint_processor::builtin_hint_processor::bootloader::program_hash::compute_program_hash_chain;
 use crate::hint_processor::builtin_hint_processor::bootloader::program_loader::ProgramLoader;
 use crate::hint_processor::builtin_hint_processor::bootloader::types::{BootloaderVersion, Task};
 use crate::hint_processor::builtin_hint_processor::bootloader::vars;
@@ -81,6 +86,11 @@ pub fn load_program_hint(
     Ok(())
 }
 
+fn field_element_to_felt(field_element: FieldElement) -> Felt252 {
+    let bytes = field_element.to_bytes_be();
+    Felt252::from_bytes_be(&bytes)
+}
+
 /// Implements
 /// from starkware.cairo.bootloaders.simple_bootloader.utils import get_task_fact_topology
 ///
@@ -128,6 +138,49 @@ pub fn append_fact_topologies(
         get_program_task_fact_topology(output_size, &task, output_builtin, output_runner_data)
             .map_err(Into::<HintError>::into)?;
     fact_topologies.push(fact_topology);
+
+    Ok(())
+}
+
+/// Implements
+/// # Validate hash.
+/// from starkware.cairo.bootloaders.hash_program import compute_program_hash_chain
+///
+/// assert memory[ids.output_ptr + 1] == compute_program_hash_chain(task.get_program()), \
+///   'Computed hash does not match input.'";
+pub fn validate_hash(
+    vm: &mut VirtualMachine,
+    exec_scopes: &mut ExecutionScopes,
+    ids_data: &HashMap<String, HintReference>,
+    ap_tracking: &ApTracking,
+) -> Result<(), HintError> {
+    let task: Task = exec_scopes.get(vars::TASK)?;
+    let program = task.get_program();
+
+    let output_ptr = get_ptr_from_var_name("output_ptr", vm, ids_data, ap_tracking)?;
+    let program_hash_ptr = (output_ptr + 1)?;
+
+    let program_hash = vm
+        .segments
+        .memory
+        .get_integer(program_hash_ptr)?
+        .into_owned();
+
+    // Compute the hash of the program
+    let computed_program_hash = compute_program_hash_chain(program, 0)
+        .map_err(|e| {
+            HintError::CustomHint(format!("Could not compute program hash: {e}").into_boxed_str())
+        })?
+        .into();
+    let computed_program_hash = field_element_to_felt(computed_program_hash);
+
+    if program_hash != computed_program_hash {
+        return Err(HintError::AssertionFailed(
+            "Computed hash does not match input"
+                .to_string()
+                .into_boxed_str(),
+        ));
+    }
 
     Ok(())
 }

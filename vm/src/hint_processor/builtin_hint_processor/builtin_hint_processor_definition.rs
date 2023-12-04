@@ -1,40 +1,15 @@
-use super::{
-    blake2s_utils::finalize_blake2s_v3,
-    bootloader::bootloader_hints::{
-        assert_is_composite_packed_output, assert_program_address, enter_packed_output_scope,
-        guess_pre_image_of_subtasks_output_hash, import_packed_output_schemas,
-        is_plain_packed_output, load_bootloader_config, prepare_simple_bootloader_input,
-        prepare_simple_bootloader_output_segment, restore_bootloader_output, save_output_pointer,
-        save_packed_outputs, set_packed_output_to_subtasks,
-    },
-    ec_recover::{
-        ec_recover_divmod_n_packed, ec_recover_product_div_m, ec_recover_product_mod,
-        ec_recover_sub_a_b,
-    },
-    field_arithmetic::{u256_get_square_root, u384_get_square_root, uint384_div},
-    secp::{
-        ec_utils::{
-            compute_doubling_slope_external_consts, compute_slope_and_assing_secp_p,
-            ec_double_assign_new_y, ec_mul_inner, ec_negate_embedded_secp_p,
-            ec_negate_import_secp_p, square_slope_minus_xs,
-        },
-        secp_utils::{ALPHA, ALPHA_V2, SECP_P, SECP_P_V2},
-    },
-    uint384::sub_reduced_a_and_reduced_b,
-    vrf::{
-        fq::{inv_mod_p_uint256, uint512_unsigned_div_rem},
-        inv_mod_p_uint512::inv_mod_p_uint512,
-        pack::*,
-    },
-};
+use felt::Felt252;
+
 use crate::hint_processor::builtin_hint_processor::bootloader::bootloader_hints::compute_and_configure_fact_topologies;
 use crate::hint_processor::builtin_hint_processor::bootloader::execute_task_hints::{
-    allocate_program_data_segment, append_fact_topologies, load_program_hint,
+    allocate_program_data_segment, append_fact_topologies, load_program_hint, validate_hash,
 };
 use crate::hint_processor::builtin_hint_processor::bootloader::simple_bootloader_hints::{
     divide_num_by_2, prepare_task_range_checks, set_ap_to_zero, set_current_task,
     set_tasks_variable,
 };
+#[cfg(feature = "skip_next_instruction_hint")]
+use crate::hint_processor::builtin_hint_processor::skip_next_instruction::skip_next_instruction;
 use crate::{
     hint_processor::{
         builtin_hint_processor::secp::ec_utils::{
@@ -126,12 +101,37 @@ use crate::{
     types::exec_scope::ExecutionScopes,
     vm::{errors::hint_errors::HintError, vm_core::VirtualMachine},
 };
-use felt::Felt252;
-
-#[cfg(feature = "skip_next_instruction_hint")]
-use crate::hint_processor::builtin_hint_processor::skip_next_instruction::skip_next_instruction;
 
 use super::blake2s_utils::example_blake2s_compress;
+use super::{
+    blake2s_utils::finalize_blake2s_v3,
+    bootloader::bootloader_hints::{
+        assert_is_composite_packed_output, assert_program_address, enter_packed_output_scope,
+        guess_pre_image_of_subtasks_output_hash, import_packed_output_schemas,
+        is_plain_packed_output, load_bootloader_config, prepare_simple_bootloader_input,
+        prepare_simple_bootloader_output_segment, restore_bootloader_output, save_output_pointer,
+        save_packed_outputs, set_packed_output_to_subtasks,
+    },
+    ec_recover::{
+        ec_recover_divmod_n_packed, ec_recover_product_div_m, ec_recover_product_mod,
+        ec_recover_sub_a_b,
+    },
+    field_arithmetic::{u256_get_square_root, u384_get_square_root, uint384_div},
+    secp::{
+        ec_utils::{
+            compute_doubling_slope_external_consts, compute_slope_and_assing_secp_p,
+            ec_double_assign_new_y, ec_mul_inner, ec_negate_embedded_secp_p,
+            ec_negate_import_secp_p, square_slope_minus_xs,
+        },
+        secp_utils::{ALPHA, ALPHA_V2, SECP_P, SECP_P_V2},
+    },
+    uint384::sub_reduced_a_and_reduced_b,
+    vrf::{
+        fq::{inv_mod_p_uint256, uint512_unsigned_div_rem},
+        inv_mod_p_uint512::inv_mod_p_uint512,
+        pack::*,
+    },
+};
 
 pub struct HintProcessorData {
     pub code: String,
@@ -897,6 +897,9 @@ impl HintProcessorLogic for BuiltinHintProcessor {
             hint_code::EXECUTE_TASK_LOAD_PROGRAM => {
                 load_program_hint(vm, exec_scopes, &hint_data.ids_data, &hint_data.ap_tracking)
             }
+            hint_code::EXECUTE_TASK_VALIDATE_HASH => {
+                validate_hash(vm, exec_scopes, &hint_data.ids_data, &hint_data.ap_tracking)
+            }
             hint_code::EXECUTE_TASK_ASSERT_PROGRAM_ADDRESS => {
                 assert_program_address(vm, exec_scopes, &hint_data.ids_data, &hint_data.ap_tracking)
             }
@@ -931,7 +934,12 @@ impl ResourceTracker for BuiltinHintProcessor {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use assert_matches::assert_matches;
+    use num_traits::{One, Zero};
+
+    #[cfg(target_arch = "wasm32")]
+    use wasm_bindgen_test::*;
+
     use crate::stdlib::any::Any;
     use crate::types::relocatable::Relocatable;
     use crate::{
@@ -943,11 +951,8 @@ mod tests {
             vm_core::VirtualMachine,
         },
     };
-    use assert_matches::assert_matches;
-    use num_traits::{One, Zero};
 
-    #[cfg(target_arch = "wasm32")]
-    use wasm_bindgen_test::*;
+    use super::*;
 
     #[test]
     #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
