@@ -486,6 +486,10 @@ mod tests {
         use crate::hint_processor::builtin_hint_processor::hint_code::BOOTLOADER_GUESS_PRE_IMAGE_OF_SUBTASKS_OUTPUT_HASH;
 
         let mut vm = vm!();
+        add_segments!(vm, 2);
+        vm.run_context.fp = 2;
+        let ids_data = ids_data!["nested_subtasks_output_len", "nested_subtasks_output"];
+
         let mut exec_scopes = ExecutionScopes::new();
 
         exec_scopes.insert_box("packed_output", Box::new(PackedOutput {}));
