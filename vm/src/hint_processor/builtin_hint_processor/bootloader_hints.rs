@@ -290,12 +290,7 @@ Implements hint:
     packed_outputs = bootloader_input.packed_outputs
 %}
 */
-pub fn save_packed_outputs(
-    _vm: &mut VirtualMachine,
-    exec_scopes: &mut ExecutionScopes,
-    _ids_data: &HashMap<String, HintReference>,
-    _ap_tracking: &ApTracking,
-) -> Result<(), HintError> {
+pub fn save_packed_outputs(exec_scopes: &mut ExecutionScopes) -> Result<(), HintError> {
     let bootloader_input: BootloaderInput = exec_scopes.get("bootloader_input")?;
     let packed_outputs = bootloader_input.packed_outputs;
     exec_scopes.insert_value("packed_outputs", packed_outputs);
@@ -308,12 +303,7 @@ Implements hint:
     packed_outputs = packed_output.subtasks
 %}
 */
-pub fn set_packed_output_to_subtasks(
-    _vm: &mut VirtualMachine,
-    exec_scopes: &mut ExecutionScopes,
-    _ids_data: &HashMap<String, HintReference>,
-    _ap_tracking: &ApTracking,
-) -> Result<(), HintError> {
+pub fn set_packed_output_to_subtasks(exec_scopes: &mut ExecutionScopes) -> Result<(), HintError> {
     let packed_outputs = exec_scopes.get::<Felt252>("packed_output")?; // TODO: need real type
     let subtasks = packed_outputs; // TODO: need type for packed_output / query its subtasks field
     exec_scopes.insert_value("packed_outputs", subtasks);
