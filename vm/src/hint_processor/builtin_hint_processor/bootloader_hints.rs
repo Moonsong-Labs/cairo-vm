@@ -644,8 +644,6 @@ mod tests {
 
     #[test]
     fn test_save_output_pointer() {
-        use crate::hint_processor::builtin_hint_processor::hint_code::BOOTLOADER_SAVE_OUTPUT_POINTER;
-
         let mut vm = vm!();
         vm.segments = segments![((1, 0), (0, 0))];
         let mut hint_ref = HintReference::new(0, 0, true, false);
@@ -654,8 +652,10 @@ mod tests {
 
         let mut exec_scopes = ExecutionScopes::new();
 
-        let hint_data =
-            HintProcessorData::new_default(String::from(BOOTLOADER_SAVE_OUTPUT_POINTER), ids_data);
+        let hint_data = HintProcessorData::new_default(
+            String::from(hint_code::BOOTLOADER_SAVE_OUTPUT_POINTER),
+            ids_data,
+        );
         let mut hint_processor = BuiltinHintProcessor::new_empty();
         assert_matches!(
             hint_processor.execute_hint(
@@ -676,8 +676,6 @@ mod tests {
 
     #[test]
     fn test_save_packed_ouputs() {
-        use crate::hint_processor::builtin_hint_processor::hint_code::BOOTLOADER_SAVE_PACKED_OUTPUTS;
-
         let packed_outputs = vec![
             PackedOutput::Plain(Default::default()),
             PackedOutput::Plain(Default::default()),
@@ -702,7 +700,7 @@ mod tests {
         exec_scopes.insert_box("bootloader_input", Box::new(bootloader_input.clone()));
 
         let hint_data = HintProcessorData::new_default(
-            String::from(BOOTLOADER_SAVE_PACKED_OUTPUTS),
+            String::from(hint_code::BOOTLOADER_SAVE_PACKED_OUTPUTS),
             HashMap::new(),
         );
         let mut hint_processor = BuiltinHintProcessor::new_empty();
@@ -730,7 +728,6 @@ mod tests {
 
     #[test]
     fn test_set_packed_output_to_subtasks() {
-        use crate::hint_processor::builtin_hint_processor::hint_code::BOOTLOADER_SET_PACKED_OUTPUT_TO_SUBTASKS;
         use felt::Felt252;
 
         let mut vm = vm!();
@@ -739,7 +736,7 @@ mod tests {
         exec_scopes.insert_box("packed_output", Box::new(Felt252::from(42)));
 
         let hint_data = HintProcessorData::new_default(
-            String::from(BOOTLOADER_SET_PACKED_OUTPUT_TO_SUBTASKS),
+            String::from(hint_code::BOOTLOADER_SET_PACKED_OUTPUT_TO_SUBTASKS),
             HashMap::new(),
         );
         let mut hint_processor = BuiltinHintProcessor::new_empty();
@@ -762,8 +759,6 @@ mod tests {
 
     #[test]
     fn test_guess_pre_image_of_subtasks_output_hash() {
-        use crate::hint_processor::builtin_hint_processor::hint_code::BOOTLOADER_GUESS_PRE_IMAGE_OF_SUBTASKS_OUTPUT_HASH;
-
         let mut vm = vm!();
         add_segments!(vm, 2);
         vm.run_context.fp = 2;
@@ -778,7 +773,7 @@ mod tests {
         );
 
         let hint_data = HintProcessorData::new_default(
-            String::from(BOOTLOADER_GUESS_PRE_IMAGE_OF_SUBTASKS_OUTPUT_HASH),
+            String::from(hint_code::BOOTLOADER_GUESS_PRE_IMAGE_OF_SUBTASKS_OUTPUT_HASH),
             ids_data.clone(),
         );
 
