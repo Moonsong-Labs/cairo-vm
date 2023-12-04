@@ -879,9 +879,7 @@ impl VirtualMachine {
     ///
     /// Returns Err(VirtualMachineError::NoOutputBuiltin) if there is no output builtin
     /// configured.
-    pub fn get_output_builtin(
-        &mut self,
-    ) -> Result<&mut OutputBuiltinRunner, VirtualMachineError> {
+    pub fn get_output_builtin(&mut self) -> Result<&mut OutputBuiltinRunner, VirtualMachineError> {
         for builtin in self.get_builtin_runners_as_mut() {
             if let BuiltinRunner::Output(output_builtin) = builtin {
                 return Ok(output_builtin);
