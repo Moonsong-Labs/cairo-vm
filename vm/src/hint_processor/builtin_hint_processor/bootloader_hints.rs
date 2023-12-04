@@ -358,6 +358,7 @@ pub fn guess_pre_image_of_subtasks_output_hash(
 mod tests {
     use crate::hint_processor::builtin_hint_processor::builtin_hint_processor_definition::BuiltinHintProcessor;
     use crate::hint_processor::builtin_hint_processor::builtin_hint_processor_definition::HintProcessorData;
+    use crate::hint_processor::builtin_hint_processor::hint_code;
     use crate::hint_processor::builtin_hint_processor::hint_utils::{
         get_integer_from_var_name, get_maybe_relocatable_from_var_name,
     };
@@ -778,16 +779,18 @@ mod tests {
 
         let hint_data = HintProcessorData::new_default(
             String::from(BOOTLOADER_GUESS_PRE_IMAGE_OF_SUBTASKS_OUTPUT_HASH),
-            ids_data,
-        );
-        let hint_data = any_box!(hint_data);
-        let mut hint_processor = BuiltinHintProcessor::new_empty();
-        assert_matches!(
-            hint_processor.execute_hint(&mut vm, &mut exec_scopes, &hint_data, &HashMap::new(),),
-            Ok(())
+            ids_data.clone(),
         );
 
-        let hint_data: &HintProcessorData = hint_data.downcast_ref().expect("type given above");
+        assert_matches!(
+            run_hint!(
+                vm,
+                ids_data,
+                hint_code::BOOTLOADER_GUESS_PRE_IMAGE_OF_SUBTASKS_OUTPUT_HASH,
+                &mut exec_scopes
+            ),
+            Ok(())
+        );
         let nested_subtasks_output_len = get_integer_from_var_name(
             "nested_subtasks_output_len",
             &vm,
