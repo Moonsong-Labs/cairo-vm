@@ -1,8 +1,11 @@
 use super::{
     blake2s_utils::finalize_blake2s_v3,
-    bootloader_hints::{
-        guess_pre_image_of_subtasks_output_hash, save_output_pointer, save_packed_outputs,
-        set_packed_output_to_subtasks,
+    bootloader::bootloader_hints::{
+        assert_is_composite_packed_output, enter_packed_output_scope,
+        guess_pre_image_of_subtasks_output_hash, import_packed_output_schemas,
+        is_plain_packed_output, load_bootloader_config, prepare_simple_bootloader_input,
+        prepare_simple_bootloader_output_segment, restore_bootloader_output, save_output_pointer,
+        save_packed_outputs, set_packed_output_to_subtasks,
     },
     ec_recover::{
         ec_recover_divmod_n_packed, ec_recover_product_div_m, ec_recover_product_mod,
@@ -23,11 +26,6 @@ use super::{
         inv_mod_p_uint512::inv_mod_p_uint512,
         pack::*,
     },
-};
-use crate::hint_processor::builtin_hint_processor::bootloader_hints::{
-    assert_is_composite_packed_output, enter_packed_output_scope, import_packed_output_schemas,
-    load_bootloader_config, prepare_simple_bootloader_input,
-    prepare_simple_bootloader_output_segment, restore_bootloader_output,
 };
 use crate::{
     hint_processor::{
@@ -861,6 +859,7 @@ impl HintProcessorLogic for BuiltinHintProcessor {
                 set_packed_output_to_subtasks(exec_scopes)
             }
             hint_code::BOOTLOADER_IMPORT_PACKED_OUTPUT_SCHEMAS => import_packed_output_schemas(),
+            hint_code::BOOTLOADER_IS_PLAIN_PACKED_OUTPUT => is_plain_packed_output(vm, exec_scopes),
             hint_code::BOOTLOADER_ASSERT_IS_COMPOSITE_PACKED_OUTPUT => {
                 assert_is_composite_packed_output(exec_scopes)
             }
