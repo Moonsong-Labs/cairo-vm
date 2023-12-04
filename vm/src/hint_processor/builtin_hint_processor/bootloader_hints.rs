@@ -3,7 +3,11 @@ use std::collections::HashMap;
 
 use felt::Felt252;
 use num_traits::ToPrimitive;
-use serde::Deserialize;
+
+use crate::hint_processor::builtin_hint_processor::bootloader::types::{
+    BootloaderInput, PackedOutput,
+};
+use crate::hint_processor::builtin_hint_processor::bootloader::vars;
 
 use crate::hint_processor::builtin_hint_processor::hint_utils::{
     get_integer_from_var_name, get_ptr_from_var_name, insert_value_from_var_name,
@@ -18,55 +22,6 @@ use crate::vm::errors::memory_errors::MemoryError;
 use crate::vm::errors::vm_errors::VirtualMachineError;
 use crate::vm::runners::builtin_runner::OutputBuiltinRunner;
 use crate::vm::vm_core::VirtualMachine;
-
-mod vars {
-    /// Deserialized bootloader input.
-    pub(crate) const BOOTLOADER_INPUT: &str = "bootloader_input";
-
-    /// Saved state of the output builtin.
-    pub(crate) const OUTPUT_BUILTIN_STATE: &str = "output_builtin_state";
-
-    /// Deserialized simple bootloader input.
-    pub(crate) const SIMPLE_BOOTLOADER_INPUT: &str = "simple_bootloader_input";
-
-    /// Packed outputs.
-    pub(crate) const PACKED_OUTPUTS: &str = "packed_outputs";
-
-    /// Packed output for the current task.
-    pub(crate) const PACKED_OUTPUT: &str = "packed_output";
-}
-
-#[derive(Deserialize, Debug, Clone, PartialEq)]
-pub struct BootloaderConfig {
-    pub simple_bootloader_program_hash: Felt252,
-    pub supported_cairo_verifier_program_hashes: Vec<Felt252>,
-}
-
-#[derive(Deserialize, Debug, Clone, PartialEq)]
-pub enum PackedOutput {
-    Plain(Vec<Felt252>),
-    Composite(Vec<Felt252>),
-}
-
-impl PackedOutput {
-    // TODO: implement and define return type
-    pub fn elements_for_hash(&self) -> Vec<()> {
-        Default::default()
-    }
-}
-
-#[derive(Deserialize, Debug, Clone, PartialEq)]
-pub struct SimpleBootloaderInput {
-    pub fact_topologies_path: Option<String>,
-    pub single_page: bool,
-}
-
-#[derive(Deserialize, Debug, Clone, PartialEq)]
-pub struct BootloaderInput {
-    pub simple_bootloader_input: SimpleBootloaderInput,
-    pub bootloader_config: BootloaderConfig,
-    pub packed_outputs: Vec<PackedOutput>,
-}
 
 fn replace_output_builtin(
     vm: &mut VirtualMachine,
@@ -388,6 +343,10 @@ mod tests {
     use crate::hint_processor::hint_processor_definition::HintProcessorLogic;
     use std::ops::Add;
 
+    use crate::hint_processor::builtin_hint_processor::bootloader::types::{
+        BootloaderConfig, SimpleBootloaderInput, Task,
+    };
+    use felt::Felt252;
     use num_traits::ToPrimitive;
     use rstest::{fixture, rstest};
 
@@ -410,6 +369,7 @@ mod tests {
             simple_bootloader_input: SimpleBootloaderInput {
                 fact_topologies_path: None,
                 single_page: false,
+                tasks: Vec::<Task>::new(),
             },
             bootloader_config: BootloaderConfig {
                 simple_bootloader_program_hash: Felt252::new(1234),
@@ -746,6 +706,7 @@ mod tests {
             simple_bootloader_input: SimpleBootloaderInput {
                 fact_topologies_path: None,
                 single_page: false,
+                tasks: vec![],
             },
             bootloader_config: BootloaderConfig {
                 simple_bootloader_program_hash: 42u64.into(),

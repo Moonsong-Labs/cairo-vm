@@ -894,7 +894,6 @@ mod tests {
     use super::*;
     use crate::stdlib::any::Any;
     use crate::types::relocatable::Relocatable;
-
     use crate::{
         any_box,
         types::{exec_scope::ExecutionScopes, relocatable::MaybeRelocatable},
