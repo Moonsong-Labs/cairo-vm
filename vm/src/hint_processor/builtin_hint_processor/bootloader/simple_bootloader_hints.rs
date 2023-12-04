@@ -156,11 +156,31 @@ mod tests {
     use crate::vm::vm_core::VirtualMachine;
 
     #[fixture]
-    fn simple_bootloader_input() -> SimpleBootloaderInput {
+    fn fibonacci() -> Program {
+        let program_content =
+            include_bytes!("../../../../../cairo_programs/fibonacci.json").to_vec();
+
+        Program::from_bytes(&program_content, Some("main"))
+            .expect("Loading example program failed unexpectedly")
+    }
+
+    #[fixture]
+    fn simple_bootloader_input(fibonacci: Program) -> SimpleBootloaderInput {
         SimpleBootloaderInput {
             fact_topologies_path: None,
             single_page: false,
-            tasks: vec![TaskSpec { task: Task {} }, TaskSpec { task: Task {} }],
+            tasks: vec![
+                TaskSpec {
+                    task: Task {
+                        program: fibonacci.clone(),
+                    },
+                },
+                TaskSpec {
+                    task: Task {
+                        program: fibonacci.clone(),
+                    },
+                },
+            ],
         }
     }
 

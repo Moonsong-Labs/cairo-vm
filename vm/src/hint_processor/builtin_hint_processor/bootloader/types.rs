@@ -1,6 +1,12 @@
+use serde::{de, Deserialize, Deserializer};
+
 use felt::Felt252;
-use serde::Deserialize;
 use std::path::PathBuf;
+
+use crate::serde::deserialize_program::deserialize_and_parse_program;
+use crate::types::program::Program;
+
+pub type BootloaderVersion = u64;
 
 #[derive(Deserialize, Debug, Clone, PartialEq)]
 pub struct BootloaderConfig {
@@ -22,7 +28,24 @@ impl PackedOutput {
 }
 
 #[derive(Deserialize, Debug, Clone, PartialEq)]
-pub struct Task {}
+pub struct Task {
+    #[serde(deserialize_with = "deserialize_program")]
+    pub program: Program,
+}
+
+fn deserialize_program<'de, D>(deserializer: D) -> Result<Program, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let obj_raw: &str = Deserialize::deserialize(deserializer)?;
+    deserialize_and_parse_program(obj_raw.as_bytes(), Some("main")).map_err(de::Error::custom)
+}
+
+impl Task {
+    pub fn get_program(&self) -> &Program {
+        &self.program
+    }
+}
 
 #[derive(Deserialize, Debug, Clone, PartialEq)]
 pub struct TaskSpec {
