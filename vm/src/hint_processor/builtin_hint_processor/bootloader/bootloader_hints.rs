@@ -855,4 +855,60 @@ mod tests {
         exec_scopes.insert_value(vars::PACKED_OUTPUT, composite_packed_output);
         assert!(assert_is_composite_packed_output(&mut exec_scopes).is_ok());
     }
+
+    #[rstest]
+    #[case(false)]
+    #[case(true)]
+    fn test_assert_program_address(#[case] expect_fail: bool) {
+        let mut vm = vm!();
+
+        add_segments!(vm, 2);
+        vm.run_context.fp = 2;
+
+        let ids_data = ids_data!("program_address");
+
+        let ap_tracking = ApTracking::new();
+
+        let mut new_segment_base = vm.add_memory_segment();
+        let _ = insert_value_from_var_name(
+            "program_address",
+            new_segment_base.clone(),
+            &mut vm,
+            &ids_data,
+            &ap_tracking,
+        ).map_err(|e| panic!("could not insert var: {}", e));
+        
+        if expect_fail {
+            new_segment_base = vm.add_memory_segment();
+        }
+
+        let mut exec_scopes = ExecutionScopes::new();
+        exec_scopes.insert_box(
+            "program_address",
+            any_box!(new_segment_base),
+        );
+
+        let hint_data = HintProcessorData::new_default(
+            String::from(hint_code::EXECUTE_TASK_ASSERT_PROGRAM_ADDRESS),
+            ids_data,
+        );
+        let mut hint_processor = BuiltinHintProcessor::new_empty();
+        
+        let result = hint_processor.execute_hint(
+            &mut vm,
+            &mut exec_scopes,
+            &any_box!(hint_data),
+            &HashMap::new(),
+        );
+        
+        match result {
+            Ok(_) => assert!(!expect_fail),
+            Err(HintError::CustomHint(e)) => {
+                assert!(expect_fail);
+                assert_eq!(e.as_ref(), "program address is incorrect");
+                ()
+            },
+            _ => panic!("result not recognized")
+        }
+    }
 }

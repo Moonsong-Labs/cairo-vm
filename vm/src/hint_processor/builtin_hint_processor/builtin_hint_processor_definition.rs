@@ -5,7 +5,7 @@ use super::{
         guess_pre_image_of_subtasks_output_hash, import_packed_output_schemas,
         is_plain_packed_output, load_bootloader_config, prepare_simple_bootloader_input,
         prepare_simple_bootloader_output_segment, restore_bootloader_output, save_output_pointer,
-        save_packed_outputs, set_packed_output_to_subtasks,
+        save_packed_outputs, set_packed_output_to_subtasks, assert_program_address,
     },
     ec_recover::{
         ec_recover_divmod_n_packed, ec_recover_product_div_m, ec_recover_product_mod,
@@ -862,6 +862,9 @@ impl HintProcessorLogic for BuiltinHintProcessor {
             hint_code::BOOTLOADER_IS_PLAIN_PACKED_OUTPUT => is_plain_packed_output(vm, exec_scopes),
             hint_code::BOOTLOADER_ASSERT_IS_COMPOSITE_PACKED_OUTPUT => {
                 assert_is_composite_packed_output(exec_scopes)
+            }
+            hint_code::EXECUTE_TASK_ASSERT_PROGRAM_ADDRESS => {
+                assert_program_address(vm, exec_scopes, &hint_data.ids_data, &hint_data.ap_tracking)
             }
             #[cfg(feature = "skip_next_instruction_hint")]
             hint_code::SKIP_NEXT_INSTRUCTION => skip_next_instruction(vm),
