@@ -1470,3 +1470,111 @@ pub const BOOTLOADER_SET_PACKED_OUTPUT_TO_SUBTASKS: &str =
 
 pub const BOOTLOADER_ASSERT_IS_COMPOSITE_PACKED_OUTPUT: &str =
     "assert isinstance(packed_output, CompositePackedOutput)";
+
+pub const SIMPLE_BOOTLOADER_PREPARE_TASK_RANGE_CHECKS: &str =
+    "n_tasks = len(simple_bootloader_input.tasks)
+memory[ids.output_ptr] = n_tasks
+
+# Task range checks are located right after simple bootloader validation range checks, and
+# this is validated later in this function.
+ids.task_range_check_ptr = ids.range_check_ptr + ids.BuiltinData.SIZE * n_tasks
+
+# A list of fact_toplogies that instruct how to generate the fact from the program output
+# for each task.
+fact_topologies = []";
+
+pub const SIMPLE_BOOTLOADER_SET_TASKS_VARIABLE: &str = "tasks = simple_bootloader_input.tasks";
+
+pub const SIMPLE_BOOTLOADER_DIVIDE_NUMS_BY_2: &str = "ids.num // 2";
+
+pub const SIMPLE_BOOTLOADER_SET_CURRENT_TASK: &str =
+    "from starkware.cairo.bootloaders.simple_bootloader.objects import Task
+
+# Pass current task to execute_task.
+task_id = len(simple_bootloader_input.tasks) - ids.n_tasks
+task = simple_bootloader_input.tasks[task_id].load_task()";
+
+pub const SIMPLE_BOOTLOADER_ZERO: &str = "0";
+
+pub const EXECUTE_TASK_SET_PROGRAM_DATA_PTR: &str =
+    "ids.program_data_ptr = program_data_base = segments.add()";
+
+pub const EXECUTE_TASK_LOAD_PROGRAM: &str =
+    "from starkware.cairo.bootloaders.simple_bootloader.utils import load_program
+
+# Call load_program to load the program header and code to memory.
+program_address, program_data_size = load_program(
+    task=task, memory=memory, program_header=ids.program_header,
+    builtins_offset=ids.ProgramHeader.builtin_list)
+segments.finalize(program_data_base.segment_index, program_data_size)";
+
+pub const EXECUTE_TASK_VALIDATE_HASH: &str = "# Validate hash.
+from starkware.cairo.bootloaders.hash_program import compute_program_hash_chain
+
+assert memory[ids.output_ptr + 1] == compute_program_hash_chain(task.get_program()), \
+  'Computed hash does not match input.'";
+
+pub const EXECUTE_TASK_ASSERT_PROGRAM_ADDRESS: &str = "# Sanity check.
+assert ids.program_address == program_address";
+
+pub const EXECUTE_TASK_CALL_TASK: &str =
+    "from starkware.cairo.bootloaders.simple_bootloader.objects import (
+    CairoPieTask,
+    RunProgramTask,
+    Task,
+)
+from starkware.cairo.bootloaders.simple_bootloader.utils import (
+    load_cairo_pie,
+    prepare_output_runner,
+)
+
+assert isinstance(task, Task)
+n_builtins = len(task.get_program().builtins)
+new_task_locals = {}
+if isinstance(task, RunProgramTask):
+    new_task_locals['program_input'] = task.program_input
+    new_task_locals['WITH_BOOTLOADER'] = True
+
+    vm_load_program(task.program, program_address)
+elif isinstance(task, CairoPieTask):
+    ret_pc = ids.ret_pc_label.instruction_offset_ - ids.call_task.instruction_offset_ + pc
+    load_cairo_pie(
+        task=task.cairo_pie, memory=memory, segments=segments,
+        program_address=program_address, execution_segment_address= ap - n_builtins,
+        builtin_runners=builtin_runners, ret_fp=fp, ret_pc=ret_pc)
+else:
+    raise NotImplementedError(f'Unexpected task type: {type(task).__name__}.')
+
+output_runner_data = prepare_output_runner(
+    task=task,
+    output_builtin=output_builtin,
+    output_ptr=ids.pre_execution_builtin_ptrs.output)
+vm_enter_scope(new_task_locals)";
+
+pub const EXECUTE_TASK_EXIT_SCOPE: &str = "vm_exit_scope()
+# Note that bootloader_input will only be available in the next hint.";
+
+pub const EXECUTE_TASK_WRITE_RETURN_BUILTINS: &str =
+    "from starkware.cairo.bootloaders.simple_bootloader.utils import write_return_builtins
+
+# Fill the values of all builtin pointers after executing the task.
+builtins = task.get_program().builtins
+write_return_builtins(
+    memory=memory, return_builtins_addr=ids.return_builtin_ptrs.address_,
+    used_builtins=builtins, used_builtins_addr=ids.used_builtins_addr,
+    pre_execution_builtins_addr=ids.pre_execution_builtin_ptrs.address_, task=task)
+
+vm_enter_scope({'n_selected_builtins': n_builtins})";
+
+pub const EXECUTE_TASK_APPEND_FACT_TOPOLOGIES: &str =
+    "from starkware.cairo.bootloaders.simple_bootloader.utils import get_task_fact_topology
+
+# Add the fact topology of the current task to 'fact_topologies'.
+output_start = ids.pre_execution_builtin_ptrs.output
+output_end = ids.return_builtin_ptrs.output
+fact_topologies.append(get_task_fact_topology(
+    output_size=output_end - output_start,
+    task=task,
+    output_builtin=output_builtin,
+    output_runner_data=output_runner_data,
+))";
