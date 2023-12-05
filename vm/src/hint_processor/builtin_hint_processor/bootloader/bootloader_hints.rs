@@ -347,10 +347,14 @@ pub fn assert_program_address(
 ) -> Result<(), HintError> {
     let ids_program_address = get_ptr_from_var_name("program_address", vm, ids_data, ap_tracking)?;
     let program_address = exec_scopes.get_any_boxed_ref("program_address")?;
-    let program_address = program_address.downcast_ref::<Relocatable>().ok_or(HintError::WrongHintData)?;
+    let program_address = program_address
+        .downcast_ref::<Relocatable>()
+        .ok_or(HintError::WrongHintData)?;
 
     if &ids_program_address != program_address {
-        return Err(HintError::CustomHint("program address is incorrect".to_string().into_boxed_str()));
+        return Err(HintError::CustomHint(
+            "program address is incorrect".to_string().into_boxed_str(),
+        ));
     }
     Ok(())
 }
@@ -876,39 +880,37 @@ mod tests {
             &mut vm,
             &ids_data,
             &ap_tracking,
-        ).map_err(|e| panic!("could not insert var: {}", e));
-        
+        )
+        .map_err(|e| panic!("could not insert var: {}", e));
+
         if expect_fail {
             new_segment_base = vm.add_memory_segment();
         }
 
         let mut exec_scopes = ExecutionScopes::new();
-        exec_scopes.insert_box(
-            "program_address",
-            any_box!(new_segment_base),
-        );
+        exec_scopes.insert_box("program_address", any_box!(new_segment_base));
 
         let hint_data = HintProcessorData::new_default(
             String::from(hint_code::EXECUTE_TASK_ASSERT_PROGRAM_ADDRESS),
             ids_data,
         );
         let mut hint_processor = BuiltinHintProcessor::new_empty();
-        
+
         let result = hint_processor.execute_hint(
             &mut vm,
             &mut exec_scopes,
             &any_box!(hint_data),
             &HashMap::new(),
         );
-        
+
         match result {
             Ok(_) => assert!(!expect_fail),
             Err(HintError::CustomHint(e)) => {
                 assert!(expect_fail);
                 assert_eq!(e.as_ref(), "program address is incorrect");
                 ()
-            },
-            _ => panic!("result not recognized")
+            }
+            _ => panic!("result not recognized"),
         }
     }
 }

@@ -1,11 +1,11 @@
 use super::{
     blake2s_utils::finalize_blake2s_v3,
     bootloader::bootloader_hints::{
-        assert_is_composite_packed_output, enter_packed_output_scope,
+        assert_is_composite_packed_output, assert_program_address, enter_packed_output_scope,
         guess_pre_image_of_subtasks_output_hash, import_packed_output_schemas,
         is_plain_packed_output, load_bootloader_config, prepare_simple_bootloader_input,
         prepare_simple_bootloader_output_segment, restore_bootloader_output, save_output_pointer,
-        save_packed_outputs, set_packed_output_to_subtasks, assert_program_address,
+        save_packed_outputs, set_packed_output_to_subtasks,
     },
     ec_recover::{
         ec_recover_divmod_n_packed, ec_recover_product_div_m, ec_recover_product_mod,
