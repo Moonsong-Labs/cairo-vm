@@ -1,3 +1,4 @@
+use num_integer::Integer;
 use num_traits::ToPrimitive;
 use std::collections::HashMap;
 
@@ -82,15 +83,9 @@ pub fn divide_num_by_2(
     ap_tracking: &ApTracking,
 ) -> Result<(), HintError> {
     let felt = get_integer_from_var_name("num", vm, ids_data, ap_tracking)?.into_owned();
+    let felt_divided_by_2 = felt.div_floor(&Felt252::from(2));
 
-    let num = felt
-        .to_u64()
-        .ok_or(HintError::Math(MathError::Felt252ToU64Conversion(
-            Box::new(felt),
-        )))?;
-
-    let num_divided_by_2 = num / 2;
-    insert_value_into_ap(vm, Felt252::from(num_divided_by_2))?;
+    insert_value_into_ap(vm, Felt252::from(felt_divided_by_2))?;
 
     Ok(())
 }
