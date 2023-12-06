@@ -348,7 +348,7 @@ pub fn assert_program_address(
     let ids_program_address = get_ptr_from_var_name("program_address", vm, ids_data, ap_tracking)?;
     let program_address: Relocatable = exec_scopes.get("program_address")?;
 
-    if &ids_program_address != program_address {
+    if ids_program_address != program_address {
         return Err(HintError::CustomHint(
             "program address is incorrect".to_string().into_boxed_str(),
         ));
