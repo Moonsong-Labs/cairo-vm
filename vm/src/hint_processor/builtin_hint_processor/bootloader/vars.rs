@@ -12,3 +12,6 @@ pub(crate) const PACKED_OUTPUTS: &str = "packed_outputs";
 
 /// Packed output for the current task.
 pub(crate) const PACKED_OUTPUT: &str = "packed_output";
+
+/// Address of current program.
+pub(crate) const PROGRAM_ADDRESS: &str = "program_address";

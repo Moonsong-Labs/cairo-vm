@@ -345,8 +345,8 @@ pub fn assert_program_address(
     ids_data: &HashMap<String, HintReference>,
     ap_tracking: &ApTracking,
 ) -> Result<(), HintError> {
-    let ids_program_address = get_ptr_from_var_name("program_address", vm, ids_data, ap_tracking)?;
-    let program_address: Relocatable = exec_scopes.get("program_address")?;
+    let ids_program_address = get_ptr_from_var_name(vars::PROGRAM_ADDRESS, vm, ids_data, ap_tracking)?;
+    let program_address: Relocatable = exec_scopes.get(vars::PROGRAM_ADDRESS)?;
 
     if ids_program_address != program_address {
         return Err(HintError::CustomHint(
@@ -866,7 +866,7 @@ mod tests {
         add_segments!(vm, 2);
         vm.run_context.fp = 2;
 
-        let ids_data = ids_data!("program_address");
+        let ids_data = ids_data!(vars::PROGRAM_ADDRESS);
         let ap_tracking = ApTracking::new();
 
         let mut ptr = Relocatable {
@@ -874,7 +874,7 @@ mod tests {
             offset: 42,
         };
         let _ = insert_value_from_var_name(
-            "program_address",
+            vars::PROGRAM_ADDRESS,
             ptr.clone(),
             &mut vm,
             &ids_data,
@@ -890,7 +890,7 @@ mod tests {
         }
 
         let mut exec_scopes = ExecutionScopes::new();
-        exec_scopes.insert_box("program_address", any_box!(ptr));
+        exec_scopes.insert_box(vars::PROGRAM_ADDRESS, any_box!(ptr));
 
         let result = run_hint!(
             vm,
