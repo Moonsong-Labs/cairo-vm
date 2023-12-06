@@ -892,17 +892,11 @@ mod tests {
         let mut exec_scopes = ExecutionScopes::new();
         exec_scopes.insert_box("program_address", any_box!(ptr));
 
-        let hint_data = HintProcessorData::new_default(
-            String::from(hint_code::EXECUTE_TASK_ASSERT_PROGRAM_ADDRESS),
-            ids_data,
-        );
-        let mut hint_processor = BuiltinHintProcessor::new_empty();
-
-        let result = hint_processor.execute_hint(
-            &mut vm,
-            &mut exec_scopes,
-            &any_box!(hint_data),
-            &HashMap::new(),
+        let result = run_hint!(
+            vm,
+            ids_data.clone(),
+            hint_code::EXECUTE_TASK_ASSERT_PROGRAM_ADDRESS,
+            &mut exec_scopes
         );
 
         match result {
