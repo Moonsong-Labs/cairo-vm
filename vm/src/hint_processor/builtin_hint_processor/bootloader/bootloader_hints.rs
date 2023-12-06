@@ -345,7 +345,8 @@ pub fn assert_program_address(
     ids_data: &HashMap<String, HintReference>,
     ap_tracking: &ApTracking,
 ) -> Result<(), HintError> {
-    let ids_program_address = get_ptr_from_var_name(vars::PROGRAM_ADDRESS, vm, ids_data, ap_tracking)?;
+    let ids_program_address =
+        get_ptr_from_var_name(vars::PROGRAM_ADDRESS, vm, ids_data, ap_tracking)?;
     let program_address: Relocatable = exec_scopes.get(vars::PROGRAM_ADDRESS)?;
 
     if ids_program_address != program_address {
