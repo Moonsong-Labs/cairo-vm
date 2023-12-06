@@ -346,10 +346,7 @@ pub fn assert_program_address(
     ap_tracking: &ApTracking,
 ) -> Result<(), HintError> {
     let ids_program_address = get_ptr_from_var_name("program_address", vm, ids_data, ap_tracking)?;
-    let program_address = exec_scopes.get_any_boxed_ref("program_address")?;
-    let program_address = program_address
-        .downcast_ref::<Relocatable>()
-        .ok_or(HintError::WrongHintData)?;
+    let program_address: Relocatable = exec_scopes.get("program_address")?;
 
     if &ids_program_address != program_address {
         return Err(HintError::CustomHint(
