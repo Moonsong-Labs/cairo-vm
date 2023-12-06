@@ -1496,7 +1496,7 @@ task = simple_bootloader_input.tasks[task_id].load_task()";
 
 pub const SIMPLE_BOOTLOADER_ZERO: &str = "0";
 
-pub const EXECUTE_TASK_SET_PROGRAM_DATA_PTR: &str =
+pub const EXECUTE_TASK_ALLOCATE_PROGRAM_DATA_SEGMENT: &str =
     "ids.program_data_ptr = program_data_base = segments.add()";
 
 pub const EXECUTE_TASK_LOAD_PROGRAM: &str =
