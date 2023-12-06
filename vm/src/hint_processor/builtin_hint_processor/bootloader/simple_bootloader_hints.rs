@@ -1,5 +1,4 @@
 use num_integer::Integer;
-use num_traits::ToPrimitive;
 use std::collections::HashMap;
 
 use felt::Felt252;
@@ -14,7 +13,6 @@ use crate::hint_processor::builtin_hint_processor::hint_utils::{
 };
 use crate::hint_processor::hint_processor_definition::HintReference;
 use crate::serde::deserialize_program::ApTracking;
-use crate::types::errors::math_errors::MathError;
 use crate::types::exec_scope::ExecutionScopes;
 use crate::vm::errors::hint_errors::HintError;
 use crate::vm::vm_core::VirtualMachine;
@@ -95,6 +93,7 @@ mod tests {
     use num_traits::ToPrimitive;
     use std::collections::HashMap;
 
+    use felt::Felt252;
     use rstest::{fixture, rstest};
 
     use crate::hint_processor::builtin_hint_processor::bootloader::simple_bootloader_hints::{
@@ -104,7 +103,9 @@ mod tests {
         FactTopology, SimpleBootloaderInput, Task,
     };
     use crate::hint_processor::builtin_hint_processor::bootloader::vars;
-    use crate::hint_processor::builtin_hint_processor::hint_utils::get_ptr_from_var_name;
+    use crate::hint_processor::builtin_hint_processor::hint_utils::{
+        get_ptr_from_var_name, insert_value_from_var_name,
+    };
     use crate::hint_processor::hint_processor_definition::HintReference;
     use crate::serde::deserialize_program::ApTracking;
     use crate::types::exec_scope::ExecutionScopes;
@@ -188,17 +189,21 @@ mod tests {
     }
 
     #[rstest]
-    #[case(128u64, 64u64)]
-    #[case(1001u64, 500u64)]
-    fn test_divide_num_by_2(#[case] num: u64, #[case] expected: u64) {
-        // Set num to 128
+    #[case(128u128, 64u128)]
+    #[case(1001u128, 500u128)]
+    fn test_divide_num_by_2(#[case] num: u128, #[case] expected: u128) {
+        let num_felt = Felt252::from(num);
+        let expected_num_felt = Felt252::from(expected);
+
         let mut vm = vm!();
-        vm.segments = segments![((1, 0), num)];
+        add_segments!(vm, 2);
         vm.run_context.ap = 1;
         vm.run_context.fp = 1;
 
         let ids_data = ids_data!["num"];
         let ap_tracking = ApTracking::new();
+
+        insert_value_from_var_name("num", num_felt, &mut vm, &ids_data, &ap_tracking).unwrap();
 
         divide_num_by_2(&mut vm, &ids_data, &ap_tracking).expect("Hint failed unexpectedly");
 
@@ -206,9 +211,7 @@ mod tests {
             .segments
             .memory
             .get_integer(vm.run_context.get_ap())
-            .unwrap()
-            .to_u64()
             .unwrap();
-        assert_eq!(divided_num, expected);
+        assert_eq!(divided_num.into_owned(), expected_num_felt);
     }
 }
