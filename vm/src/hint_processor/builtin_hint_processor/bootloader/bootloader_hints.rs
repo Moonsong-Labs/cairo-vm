@@ -867,13 +867,15 @@ mod tests {
         vm.run_context.fp = 2;
 
         let ids_data = ids_data!("program_address");
-
         let ap_tracking = ApTracking::new();
 
-        let mut new_segment_base = vm.add_memory_segment();
+        let mut ptr = Relocatable {
+            segment_index: 42,
+            offset: 42,
+        };
         let _ = insert_value_from_var_name(
             "program_address",
-            new_segment_base.clone(),
+            ptr.clone(),
             &mut vm,
             &ids_data,
             &ap_tracking,
@@ -881,11 +883,14 @@ mod tests {
         .map_err(|e| panic!("could not insert var: {}", e));
 
         if expect_fail {
-            new_segment_base = vm.add_memory_segment();
+            ptr = Relocatable {
+                segment_index: 1,
+                offset: 1,
+            };
         }
 
         let mut exec_scopes = ExecutionScopes::new();
-        exec_scopes.insert_box("program_address", any_box!(new_segment_base));
+        exec_scopes.insert_box("program_address", any_box!(ptr));
 
         let hint_data = HintProcessorData::new_default(
             String::from(hint_code::EXECUTE_TASK_ASSERT_PROGRAM_ADDRESS),
