@@ -891,6 +891,7 @@ impl HintProcessorLogic for BuiltinHintProcessor {
             hint_code::SIMPLE_BOOTLOADER_SET_CURRENT_TASK => {
                 set_current_task(vm, exec_scopes, &hint_data.ids_data, &hint_data.ap_tracking)
             }
+            hint_code::EXECUTE_TASK_EXIT_SCOPE => exit_scope(exec_scopes),
             #[cfg(feature = "skip_next_instruction_hint")]
             hint_code::SKIP_NEXT_INSTRUCTION => skip_next_instruction(vm),
             code => Err(HintError::UnknownHint(code.to_string().into_boxed_str())),
