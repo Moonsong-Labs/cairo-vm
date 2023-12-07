@@ -42,6 +42,7 @@ pub fn prepare_task_range_checks(
     vm.insert_value(output_ptr, Felt252::from(n_tasks))?;
 
     // ids.task_range_check_ptr = ids.range_check_ptr + ids.BuiltinData.SIZE * n_tasks
+    // BuiltinData is a struct with 8 members defined in execute_task.cairo.
     const BUILTIN_DATA_SIZE: usize = 8;
     let range_check_ptr = get_ptr_from_var_name("range_check_ptr", vm, ids_data, ap_tracking)?;
     let task_range_check_ptr = (range_check_ptr + BUILTIN_DATA_SIZE * n_tasks)?;
