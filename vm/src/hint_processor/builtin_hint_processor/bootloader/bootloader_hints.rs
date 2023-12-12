@@ -289,8 +289,6 @@ pub fn save_packed_outputs(exec_scopes: &mut ExecutionScopes) -> Result<(), Hint
 }
 
 /// Implements
-/// const COMPUTE_FACT_TOPOLOGIES: &str = "from typing import List
-///
 /// from starkware.cairo.bootloaders.bootloader.utils import compute_fact_topologies
 /// from starkware.cairo.bootloaders.fact_topology import FactTopology
 /// from starkware.cairo.bootloaders.simple_bootloader.utils import (
@@ -315,7 +313,7 @@ pub fn save_packed_outputs(exec_scopes: &mut ExecutionScopes) -> Result<(), Hint
 ///     write_to_fact_topologies_file(
 ///         fact_topologies_path=bootloader_input.fact_topologies_path,
 ///         fact_topologies=plain_fact_topologies,
-///     )";
+///     )
 pub fn compute_and_configure_fact_topologies(
     vm: &mut VirtualMachine,
     exec_scopes: &mut ExecutionScopes,
