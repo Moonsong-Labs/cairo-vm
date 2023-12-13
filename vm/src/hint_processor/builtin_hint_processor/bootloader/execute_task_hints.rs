@@ -1,13 +1,14 @@
-use crate::hint_processor::builtin_hint_processor::bootloader::fact_topologies::{
-    get_program_task_fact_topology, FactTopology,
-};
-use num_traits::ToPrimitive;
+use std::any::Any;
 use std::collections::HashMap;
 
+use num_traits::ToPrimitive;
 use starknet_crypto::FieldElement;
 
 use felt::Felt252;
 
+use crate::hint_processor::builtin_hint_processor::bootloader::fact_topologies::{
+    get_program_task_fact_topology, FactTopology,
+};
 use crate::hint_processor::builtin_hint_processor::bootloader::program_hash::compute_program_hash_chain;
 use crate::hint_processor::builtin_hint_processor::bootloader::program_loader::ProgramLoader;
 use crate::hint_processor::builtin_hint_processor::bootloader::types::{BootloaderVersion, Task};
@@ -16,13 +17,14 @@ use crate::hint_processor::builtin_hint_processor::hint_utils::{
     get_ptr_from_var_name, get_relocatable_from_var_name, insert_value_from_var_name,
 };
 use crate::hint_processor::hint_processor_definition::HintReference;
-use crate::serde::deserialize_program::ApTracking;
+use crate::serde::deserialize_program::{ApTracking, BuiltinName};
 use crate::types::errors::math_errors::MathError;
 use crate::types::exec_scope::ExecutionScopes;
 use crate::types::relocatable::Relocatable;
 use crate::vm::errors::hint_errors::HintError;
 use crate::vm::runners::cairo_pie::OutputBuiltinAdditionalData;
 use crate::vm::vm_core::VirtualMachine;
+use crate::vm::vm_memory::memory::Memory;
 
 /// Implements %{ ids.program_data_ptr = program_data_base = segments.add() %}.
 ///
@@ -185,9 +187,114 @@ pub fn validate_hash(
     Ok(())
 }
 
+/// List of all builtins in the order used by the bootloader.
+const ALL_BUILTINS: [BuiltinName; 8] = [
+    BuiltinName::output,
+    BuiltinName::pedersen,
+    BuiltinName::range_check,
+    BuiltinName::ecdsa,
+    BuiltinName::bitwise,
+    BuiltinName::ec_op,
+    BuiltinName::keccak,
+    BuiltinName::poseidon,
+];
+
+/// Writes the updated builtin pointers after the program execution to the given return builtins
+/// address.
+///     
+/// `used_builtins` is the list of builtins used by the program and thus updated by it.
+fn write_return_builtins(
+    memory: &mut Memory,
+    return_builtins_addr: &Relocatable,
+    used_builtins: &[BuiltinName],
+    used_builtins_addr: &Relocatable,
+    pre_execution_builtins_addr: &Relocatable,
+    _task: &Task,
+) -> Result<(), HintError> {
+    let mut used_builtin_offset: usize = 0;
+    for (index, builtin) in ALL_BUILTINS.iter().enumerate() {
+        if used_builtins.contains(builtin) {
+            let builtin_value = memory
+                .get_integer(used_builtins_addr + used_builtin_offset)?
+                .into_owned();
+            memory.insert_value(return_builtins_addr + index, builtin_value)?;
+            used_builtin_offset += 1;
+
+            // TODO: if isinstance(task, CairoPie) check
+        }
+        // The builtin is unused, hence its value is the same as before calling the program.
+        else {
+            let pre_execution_value = memory
+                .get_integer(pre_execution_builtins_addr + index)?
+                .into_owned();
+            memory.insert_value(return_builtins_addr + index, pre_execution_value)?;
+        }
+    }
+    Ok(())
+}
+
+/// Implements
+/// from starkware.cairo.bootloaders.simple_bootloader.utils import write_return_builtins
+///
+/// # Fill the values of all builtin pointers after executing the task.
+/// builtins = task.get_program().builtins
+/// write_return_builtins(
+///     memory=memory, return_builtins_addr=ids.return_builtin_ptrs.address_,
+///     used_builtins=builtins, used_builtins_addr=ids.used_builtins_addr,
+///     pre_execution_builtins_addr=ids.pre_execution_builtin_ptrs.address_, task=task)
+///
+/// vm_enter_scope({'n_selected_builtins': n_builtins})
+///
+/// This hint looks at the builtins written by the program and merges them with the stored
+/// pre-execution values (stored in a struct named ids.pre_execution_builtin_ptrs) to
+/// create a final BuiltinData struct for the program.
+pub fn write_return_builtins_hint(
+    vm: &mut VirtualMachine,
+    exec_scopes: &mut ExecutionScopes,
+    ids_data: &HashMap<String, HintReference>,
+    ap_tracking: &ApTracking,
+) -> Result<(), HintError> {
+    let task: Task = exec_scopes.get(vars::TASK)?;
+    let n_builtins: usize = exec_scopes.get(vars::N_BUILTINS)?;
+
+    // builtins = task.get_program().builtins
+    let builtins = &task.get_program().builtins;
+
+    // write_return_builtins(
+    //     memory=memory, return_builtins_addr=ids.return_builtin_ptrs.address_,
+    //     used_builtins=builtins, used_builtins_addr=ids.used_builtins_addr,
+    //     pre_execution_builtins_addr=ids.pre_execution_builtin_ptrs.address_, task=task)
+    let return_builtins_addr =
+        get_relocatable_from_var_name("return_builtin_ptrs", vm, ids_data, ap_tracking)?;
+    let used_builtins_addr =
+        get_ptr_from_var_name("used_builtins_addr", vm, ids_data, ap_tracking)?;
+    let pre_execution_builtins_addr =
+        get_relocatable_from_var_name("pre_execution_builtin_ptrs", vm, ids_data, ap_tracking)?;
+
+    write_return_builtins(
+        &mut vm.segments.memory,
+        &return_builtins_addr,
+        builtins,
+        &used_builtins_addr,
+        &pre_execution_builtins_addr,
+        &task,
+    )?;
+
+    // vm_enter_scope({'n_selected_builtins': n_builtins})
+    let n_builtins: Box<dyn Any> = Box::new(n_builtins);
+    exec_scopes.enter_scope(HashMap::from([(
+        vars::N_SELECTED_BUILTINS.to_string(),
+        n_builtins,
+    )]));
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use rstest::{fixture, rstest};
+
+    use felt::Felt252;
 
     use crate::hint_processor::builtin_hint_processor::hint_utils::get_ptr_from_var_name;
     use crate::types::relocatable::Relocatable;
@@ -239,6 +346,15 @@ mod tests {
     fn fibonacci() -> Program {
         let program_content =
             include_bytes!("../../../../../cairo_programs/fibonacci.json").to_vec();
+
+        Program::from_bytes(&program_content, Some("main"))
+            .expect("Loading example program failed unexpectedly")
+    }
+
+    #[fixture]
+    fn field_arithmetic_program() -> Program {
+        let program_content =
+            include_bytes!("../../../../../cairo_programs/field_arithmetic.json").to_vec();
 
         Program::from_bytes(&program_content, Some("main"))
             .expect("Loading example program failed unexpectedly")
@@ -350,5 +466,80 @@ mod tests {
             output_builtin_additional_data,
             BuiltinAdditionalData::Output(data) if data == output_runner_data,
         ));
+    }
+
+    #[rstest]
+    fn test_write_output_builtins(field_arithmetic_program: Program) {
+        let task = Task {
+            program: field_arithmetic_program.clone(),
+        };
+
+        let mut vm = vm!();
+        // Allocate space for all the builtin list structs (3 x 8 felts).
+        // The pre-execution struct starts at (1, 0), the used builtins list at (1, 8)
+        // and the return struct at (1, 16).
+        // Initialize the pre-execution struct to [1, 2, 3, 4, 5, 6, 7, 8].
+        // Initialize the used builtins to {range_check: 30, bitwise: 50} as these two
+        // are used by the field arithmetic program. Note that the used builtins list
+        // does not contain empty elements (i.e. offsets are 8 and 9 instead of 10 and 12).
+        vm.segments = segments![
+            ((1, 0), 1),
+            ((1, 1), 2),
+            ((1, 2), 3),
+            ((1, 3), 4),
+            ((1, 4), 5),
+            ((1, 5), 6),
+            ((1, 6), 7),
+            ((1, 7), 8),
+            ((1, 8), 30),
+            ((1, 9), 50),
+            ((1, 24), (1, 8)),
+        ];
+        vm.run_context.fp = 25;
+        add_segments!(vm, 1);
+
+        // Note that used_builtins_addr is a pointer to the used builtins list at (1, 8)
+        let ids_data = non_continuous_ids_data![
+            ("pre_execution_builtin_ptrs", -25),
+            ("return_builtin_ptrs", -9),
+            ("used_builtins_addr", -1),
+        ];
+        let ap_tracking = ApTracking::new();
+
+        let mut exec_scopes = ExecutionScopes::new();
+        let n_builtins = task.get_program().builtins.len();
+        exec_scopes.insert_value(vars::N_BUILTINS, n_builtins);
+        exec_scopes.insert_value(vars::TASK, task);
+
+        write_return_builtins_hint(&mut vm, &mut exec_scopes, &ids_data, &ap_tracking)
+            .expect("Hint failed unexpectedly");
+
+        // Check that the return builtins were written correctly
+        let return_builtins = vm
+            .segments
+            .memory
+            .get_integer_range(Relocatable::from((1, 16)), 8)
+            .expect("Return builtin was not properly written to memory.");
+
+        let expected_builtins = vec![1, 2, 30, 4, 50, 6, 7, 8];
+        for (expected, actual) in std::iter::zip(expected_builtins, return_builtins) {
+            assert_eq!(Felt252::from(expected), actual.into_owned());
+        }
+
+        // Check that the exec scope changed
+        assert_eq!(
+            exec_scopes.data.len(),
+            2,
+            "A new scope should have been declared"
+        );
+        assert_eq!(
+            exec_scopes.data[1].len(),
+            1,
+            "The new scope should only contain one variable"
+        );
+        let n_selected_builtins: usize = exec_scopes
+            .get(vars::N_SELECTED_BUILTINS)
+            .expect("n_selected_builtins should be set");
+        assert_eq!(n_selected_builtins, n_builtins);
     }
 }

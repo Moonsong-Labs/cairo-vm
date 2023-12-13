@@ -3,6 +3,7 @@ use felt::Felt252;
 use crate::hint_processor::builtin_hint_processor::bootloader::bootloader_hints::compute_and_configure_fact_topologies;
 use crate::hint_processor::builtin_hint_processor::bootloader::execute_task_hints::{
     allocate_program_data_segment, append_fact_topologies, load_program_hint, validate_hash,
+    write_return_builtins_hint,
 };
 use crate::hint_processor::builtin_hint_processor::bootloader::simple_bootloader_hints::{
     divide_num_by_2, prepare_task_range_checks, set_ap_to_zero, set_current_task,
@@ -903,6 +904,12 @@ impl HintProcessorLogic for BuiltinHintProcessor {
             hint_code::EXECUTE_TASK_ASSERT_PROGRAM_ADDRESS => {
                 assert_program_address(vm, exec_scopes, &hint_data.ids_data, &hint_data.ap_tracking)
             }
+            hint_code::EXECUTE_TASK_WRITE_RETURN_BUILTINS => write_return_builtins_hint(
+                vm,
+                exec_scopes,
+                &hint_data.ids_data,
+                &hint_data.ap_tracking,
+            ),
             hint_code::EXECUTE_TASK_EXIT_SCOPE => exit_scope(exec_scopes),
             hint_code::EXECUTE_TASK_APPEND_FACT_TOPOLOGIES => {
                 append_fact_topologies(vm, exec_scopes, &hint_data.ids_data, &hint_data.ap_tracking)
