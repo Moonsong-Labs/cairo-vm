@@ -3,7 +3,7 @@ use crate::types::relocatable::{MaybeRelocatable, Relocatable};
 use crate::vm::errors::memory_errors::MemoryError;
 use crate::vm::errors::runner_errors::RunnerError;
 use crate::vm::runners::cairo_pie::{
-    BuiltinAdditionalData, OutputBuiltinAdditionalData, Pages, PublicMemoryPage,
+    Attributes, BuiltinAdditionalData, OutputBuiltinAdditionalData, Pages, PublicMemoryPage,
 };
 use crate::vm::vm_core::VirtualMachine;
 use crate::vm::vm_memory::memory::Memory;
@@ -15,6 +15,7 @@ use super::OUTPUT_BUILTIN_NAME;
 pub struct OutputBuiltinRunner {
     base: usize,
     pub(crate) pages: Pages,
+    pub(crate) attributes: Attributes,
     pub(crate) stop_ptr: Option<usize>,
     pub(crate) included: bool,
 }
@@ -24,6 +25,7 @@ impl OutputBuiltinRunner {
         OutputBuiltinRunner {
             base: 0,
             pages: HashMap::default(),
+            attributes: HashMap::default(),
             stop_ptr: None,
             included,
         }
@@ -33,6 +35,7 @@ impl OutputBuiltinRunner {
         Self {
             base: segment.segment_index as usize,
             pages: HashMap::default(),
+            attributes: HashMap::default(),
             stop_ptr: None,
             included,
         }
@@ -123,9 +126,16 @@ impl OutputBuiltinRunner {
 
     pub fn get_additional_data(&self) -> BuiltinAdditionalData {
         BuiltinAdditionalData::Output(OutputBuiltinAdditionalData {
+            base: self.base,
             pages: self.pages.clone(),
-            attributes: HashMap::default(),
+            attributes: self.attributes.clone(),
         })
+    }
+
+    pub fn set_state(&mut self, data: OutputBuiltinAdditionalData) {
+        self.base = data.base;
+        self.pages = data.pages;
+        self.attributes = data.attributes;
     }
 
     pub fn add_page(
@@ -479,6 +489,7 @@ mod tests {
         assert_eq!(
             builtin.get_additional_data(),
             BuiltinAdditionalData::Output(OutputBuiltinAdditionalData {
+                base: builtin.base,
                 pages: HashMap::default(),
                 attributes: HashMap::default()
             })

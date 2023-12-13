@@ -1,10 +1,12 @@
-use crate::hint_processor::builtin_hint_processor::bootloader::types::PackedOutput;
+use crate::hint_processor::builtin_hint_processor::bootloader::types::{PackedOutput, Task};
 use crate::types::errors::math_errors::MathError;
 use crate::types::relocatable::Relocatable;
 use crate::vm::errors::hint_errors::HintError;
 use crate::vm::errors::runner_errors::RunnerError;
 use crate::vm::runners::builtin_runner::OutputBuiltinRunner;
-use felt::Felt252;
+use crate::vm::runners::cairo_pie::{
+    BuiltinAdditionalData, OutputBuiltinAdditionalData, Pages, PublicMemoryPage,
+};
 use serde::Serialize;
 use std::fs::File;
 use std::path::Path;
@@ -12,7 +14,7 @@ use std::path::Path;
 #[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct FactTopology {
     #[allow(dead_code)]
-    pub tree_structure: Vec<Felt252>,
+    pub tree_structure: Vec<usize>,
     pub page_sizes: Vec<usize>,
 }
 
@@ -27,8 +29,43 @@ impl AsRef<FactTopology> for FactTopology {
     }
 }
 
+#[derive(thiserror_no_std::Error, Debug)]
+pub enum PageError {
+    #[error("Expected page ID {0}, found {1}")]
+    UnexpectedPageId(usize, usize),
+
+    #[error("Invalid page start: {0}")]
+    InvalidPageStart(usize),
+
+    #[error("Expected page start {0}, found {1}")]
+    UnexpectedPageStart(usize, usize),
+
+    #[error("Pages must cover the entire program output")]
+    OutputNotFullyCovered,
+}
+
+#[derive(thiserror_no_std::Error, Debug)]
+pub enum TreeStructureError {
+    #[error("Invalid tree structure specified in the gps_fact_topology attribute")]
+    InvalidTreeStructure,
+
+    #[error(
+        "Additional pages cannot be used since the gps_fact_topology attribute is not specified"
+    )]
+    CannotUseAdditionalPages,
+}
+
 #[derive(Debug, thiserror_no_std::Error)]
 pub enum FactTopologyError {
+    #[error(transparent)]
+    Math(#[from] MathError),
+
+    #[error(transparent)]
+    PageSize(#[from] PageError),
+
+    #[error(transparent)]
+    TreeStructure(#[from] TreeStructureError),
+
     #[error("Expected {0} fact topologies but got {1}")]
     WrongNumberOfFactTopologies(usize, usize),
 
@@ -38,25 +75,18 @@ pub enum FactTopologyError {
     #[error("Could not add page to output: {0}")]
     FailedToAddOutputPage(#[from] RunnerError),
 
-    #[error(transparent)]
-    Math(#[from] MathError),
+    #[error("Unexpected error: {0}")]
+    Internal(Box<str>),
 }
 
 impl Into<HintError> for FactTopologyError {
     fn into(self) -> HintError {
         match self {
+            FactTopologyError::Math(e) => HintError::Math(e),
             FactTopologyError::WrongNumberOfFactTopologies(_, _) => {
                 HintError::AssertionFailed(self.to_string().into_boxed_str())
             }
-            FactTopologyError::CompositePackedOutputNotSupported(_) => HintError::CustomHint(
-                "Cannot compute fact topologies for composite packed outputs (yet)"
-                    .to_string()
-                    .into_boxed_str(),
-            ),
-            FactTopologyError::FailedToAddOutputPage(e) => HintError::CustomHint(
-                format!("Cannot add output page to output segment: {}", e).into_boxed_str(),
-            ),
-            FactTopologyError::Math(e) => HintError::Math(e),
+            _ => HintError::CustomHint(self.to_string().into_boxed_str()),
         }
     }
 }
@@ -189,6 +219,142 @@ pub fn configure_fact_topologies<FT: AsRef<FactTopology>>(
     }
 
     Ok(())
+}
+
+fn check_tree_structure(tree_structure: &[usize]) -> Result<(), TreeStructureError> {
+    if (!tree_structure.len().is_power_of_two()) || (tree_structure.len() > 10) {
+        return Err(TreeStructureError::InvalidTreeStructure);
+    }
+
+    let max_element_size: usize = 1 << 30;
+    for x in tree_structure {
+        if *x > max_element_size {
+            return Err(TreeStructureError::InvalidTreeStructure);
+        }
+    }
+
+    Ok(())
+}
+
+const GPS_FACT_TOPOLOGY: &str = "gps_fact_topology";
+
+/// Extracts the tree structure from the output data attributes, or returns a default.
+fn get_tree_structure_from_output_data(
+    output_builtin_additional_data: &OutputBuiltinAdditionalData,
+) -> Result<Vec<usize>, TreeStructureError> {
+    let pages = &output_builtin_additional_data.pages;
+    let attributes = &output_builtin_additional_data.attributes;
+
+    // If the GPS_FACT_TOPOLOGY attribute is present, use it. Otherwise, the task is expected to
+    // use exactly one page (page 0).
+    let tree_structure = match attributes.get(GPS_FACT_TOPOLOGY) {
+        Some(tree_structure_attr) => {
+            check_tree_structure(tree_structure_attr)?;
+            tree_structure_attr.clone()
+        }
+        None => {
+            if pages.len() != 0 {
+                return Err(TreeStructureError::CannotUseAdditionalPages);
+            }
+            vec![1, 0]
+        }
+    };
+
+    Ok(tree_structure)
+}
+
+/// Returns the sizes of the program output pages, given the pages that appears
+/// in the additional attributes of the output builtin.
+fn get_page_sizes_from_pages(output_size: usize, pages: &Pages) -> Result<Vec<usize>, PageError> {
+    // Make sure the pages are adjacent to each other.
+
+    // The first page id is expected to be 1.
+    let mut expected_page_id: usize = 1;
+    // We don't expect anything on its start value.
+    let mut expected_page_start: usize = 0;
+    // The size of page 0 is output_size if there are no other pages, or the start of page 1
+    // otherwise.
+    let mut page0_size = output_size;
+
+    let mut page_sizes: Vec<usize> = vec![0; pages.len() + 1];
+
+    let sorted_pages_vec = {
+        let mut v: Vec<(&usize, &PublicMemoryPage)> = pages.iter().collect();
+        v.sort_by_key(|x| x.0);
+        v
+    };
+
+    for (index, (page_id, page)) in sorted_pages_vec.iter().cloned().enumerate() {
+        if *page_id != expected_page_id {
+            return Err(PageError::UnexpectedPageId(expected_page_id, *page_id));
+        }
+
+        if *page_id == 1 {
+            if page.start > output_size {
+                return Err(PageError::InvalidPageStart(page.start));
+            }
+            page0_size = page.start;
+        } else {
+            if page.start != expected_page_start {
+                return Err(PageError::UnexpectedPageStart(
+                    expected_page_start,
+                    page.start,
+                ));
+            }
+        }
+
+        page_sizes[index + 1] = page.size;
+        expected_page_start = page.start + page.size;
+        expected_page_id += 1;
+    }
+
+    if pages.len() > 0 {
+        // The loop above did not cover the whole output range
+        if expected_page_start != output_size {
+            return Err(PageError::OutputNotFullyCovered);
+        }
+    }
+
+    page_sizes[0] = page0_size;
+    Ok(page_sizes)
+}
+
+fn get_fact_topology_from_additional_data(
+    output_size: usize,
+    output_builtin_additional_data: &OutputBuiltinAdditionalData,
+) -> Result<FactTopology, FactTopologyError> {
+    let tree_structure = get_tree_structure_from_output_data(&output_builtin_additional_data)?;
+    let page_sizes = get_page_sizes_from_pages(output_size, &output_builtin_additional_data.pages)?;
+
+    Ok(FactTopology {
+        tree_structure,
+        page_sizes,
+    })
+}
+
+// TODO: implement for CairoPieTask
+pub fn get_program_task_fact_topology(
+    output_size: usize,
+    _task: &Task,
+    output_builtin: &mut OutputBuiltinRunner,
+    output_runner_data: OutputBuiltinAdditionalData,
+) -> Result<FactTopology, FactTopologyError> {
+    let additional_data = match output_builtin.get_additional_data() {
+        BuiltinAdditionalData::Output(data) => data,
+        other => {
+            return Err(FactTopologyError::Internal(
+                format!(
+                    "Additional data of output builtin is not of the expected type: {:?}",
+                    other
+                )
+                .into_boxed_str(),
+            ))
+        }
+    };
+    let fact_topology = get_fact_topology_from_additional_data(output_size, &additional_data)?;
+    output_builtin.set_state(output_runner_data);
+
+    Ok(fact_topology)
 }
 
 /// Writes fact topologies to a file, as JSON.
@@ -342,5 +508,138 @@ mod tests {
                 (4, PublicMemoryPage { start: 20, size: 3 })
             ])
         );
+    }
+
+    #[test]
+    fn test_get_tree_structure() {
+        let expected_tree_structure = vec![7, 12, 4, 0];
+
+        let output_builtin_data = OutputBuiltinAdditionalData {
+            base: 0,
+            pages: HashMap::new(),
+            attributes: HashMap::from([(
+                GPS_FACT_TOPOLOGY.to_string(),
+                expected_tree_structure.clone(),
+            )]),
+        };
+
+        let tree_structure = get_tree_structure_from_output_data(&output_builtin_data)
+            .expect("Failed to get tree structure");
+        assert_eq!(tree_structure, expected_tree_structure);
+    }
+
+    #[test]
+    fn test_get_tree_structure_default() {
+        let output_builtin_data = OutputBuiltinAdditionalData {
+            base: 0,
+            pages: HashMap::new(),
+            attributes: HashMap::new(),
+        };
+
+        let tree_structure = get_tree_structure_from_output_data(&output_builtin_data)
+            .expect("Failed to get tree structure");
+        assert_eq!(tree_structure, vec![1, 0]);
+    }
+
+    #[rstest]
+    #[case::uneven_tree(vec![1, 3, 7])]
+    #[case::tree_too_long(vec![1; 12])]
+    #[case::value_too_large(vec![0, 1073741825])] // 1073741825 = 2^30 + 1
+    fn test_get_tree_structure_invalid_tree(#[case] tree_structure: Vec<usize>) {
+        let output_builtin_data = OutputBuiltinAdditionalData {
+            base: 0,
+            pages: HashMap::new(),
+            attributes: HashMap::from([(GPS_FACT_TOPOLOGY.to_string(), tree_structure.clone())]),
+        };
+
+        let result = get_tree_structure_from_output_data(&output_builtin_data);
+        assert!(matches!(
+            result,
+            Err(TreeStructureError::InvalidTreeStructure)
+        ));
+    }
+
+    #[test]
+    fn test_get_tree_structure_default_with_pages() {
+        let output_builtin_data = OutputBuiltinAdditionalData {
+            base: 0,
+            pages: HashMap::from([(1, PublicMemoryPage { start: 0, size: 10 })]),
+            attributes: HashMap::new(),
+        };
+
+        let result = get_tree_structure_from_output_data(&output_builtin_data);
+        assert!(matches!(
+            result,
+            Err(TreeStructureError::CannotUseAdditionalPages)
+        ));
+    }
+
+    #[test]
+    fn test_get_page_sizes_from_pages() {
+        let output_size = 10usize;
+        let pages = HashMap::from([
+            (1, PublicMemoryPage { start: 0, size: 7 }),
+            (2, PublicMemoryPage { start: 7, size: 3 }),
+        ]);
+
+        let page_sizes =
+            get_page_sizes_from_pages(output_size, &pages).expect("Could not compute page sizes");
+        assert_eq!(page_sizes, vec![0, 7, 3]);
+    }
+
+    #[test]
+    fn test_get_page_sizes_missing() {
+        let output_size = 10usize;
+        let page_sizes = get_page_sizes_from_pages(output_size, &HashMap::new())
+            .expect("Could not compute page sizes");
+        assert_eq!(page_sizes, vec![output_size]);
+    }
+
+    #[test]
+    fn test_get_page_sizes_unexpected_page_id() {
+        let output_size = 10usize;
+        let pages = HashMap::from([
+            (1, PublicMemoryPage { start: 0, size: 7 }),
+            (3, PublicMemoryPage { start: 7, size: 3 }),
+        ]);
+
+        let result = get_page_sizes_from_pages(output_size, &pages);
+        assert!(matches!(result, Err(PageError::UnexpectedPageId(2, 3))));
+    }
+
+    #[test]
+    fn test_get_page_sizes_invalid_page_start() {
+        let output_size = 10usize;
+        let pages = HashMap::from([
+            (1, PublicMemoryPage { start: 12, size: 7 }),
+            (2, PublicMemoryPage { start: 19, size: 3 }),
+        ]);
+
+        let result = get_page_sizes_from_pages(output_size, &pages);
+        assert!(matches!(result, Err(PageError::InvalidPageStart(12))));
+    }
+
+    #[test]
+    fn test_get_page_sizes_unexpected_page_start() {
+        let output_size = 10usize;
+        let pages = HashMap::from([
+            (1, PublicMemoryPage { start: 0, size: 7 }),
+            (2, PublicMemoryPage { start: 8, size: 3 }),
+        ]);
+
+        let result = get_page_sizes_from_pages(output_size, &pages);
+        assert!(matches!(result, Err(PageError::UnexpectedPageStart(7, 8))));
+    }
+
+    #[test]
+    fn test_get_page_sizes_output_not_fully_covered() {
+        let output_size = 10usize;
+        let pages = HashMap::from([
+            (1, PublicMemoryPage { start: 0, size: 7 }),
+            (2, PublicMemoryPage { start: 7, size: 2 }),
+        ]);
+
+        let result = get_page_sizes_from_pages(output_size, &pages);
+        assert!(matches!(result, Err(PageError::OutputNotFullyCovered)));
     }
 }

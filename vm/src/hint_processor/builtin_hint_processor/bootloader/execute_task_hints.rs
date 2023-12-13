@@ -1,16 +1,22 @@
+use crate::hint_processor::builtin_hint_processor::bootloader::fact_topologies::{
+    get_program_task_fact_topology, FactTopology,
+};
+use num_traits::ToPrimitive;
 use std::collections::HashMap;
 
 use crate::hint_processor::builtin_hint_processor::bootloader::program_loader::ProgramLoader;
 use crate::hint_processor::builtin_hint_processor::bootloader::types::{BootloaderVersion, Task};
 use crate::hint_processor::builtin_hint_processor::bootloader::vars;
 use crate::hint_processor::builtin_hint_processor::hint_utils::{
-    get_ptr_from_var_name, insert_value_from_var_name,
+    get_ptr_from_var_name, get_relocatable_from_var_name, insert_value_from_var_name,
 };
 use crate::hint_processor::hint_processor_definition::HintReference;
 use crate::serde::deserialize_program::ApTracking;
+use crate::types::errors::math_errors::MathError;
 use crate::types::exec_scope::ExecutionScopes;
 use crate::types::relocatable::Relocatable;
 use crate::vm::errors::hint_errors::HintError;
+use crate::vm::runners::cairo_pie::OutputBuiltinAdditionalData;
 use crate::vm::vm_core::VirtualMachine;
 
 /// Implements %{ ids.program_data_ptr = program_data_base = segments.add() %}.
@@ -75,6 +81,57 @@ pub fn load_program_hint(
     Ok(())
 }
 
+/// Implements
+/// from starkware.cairo.bootloaders.simple_bootloader.utils import get_task_fact_topology
+///
+/// # Add the fact topology of the current task to 'fact_topologies'.
+/// output_start = ids.pre_execution_builtin_ptrs.output
+/// output_end = ids.return_builtin_ptrs.output
+/// fact_topologies.append(get_task_fact_topology(
+///     output_size=output_end - output_start,
+///     task=task,
+///     output_builtin=output_builtin,
+///     output_runner_data=output_runner_data,
+/// ))
+pub fn append_fact_topologies(
+    vm: &mut VirtualMachine,
+    exec_scopes: &mut ExecutionScopes,
+    ids_data: &HashMap<String, HintReference>,
+    ap_tracking: &ApTracking,
+) -> Result<(), HintError> {
+    let task: Task = exec_scopes.get(vars::TASK)?;
+    let output_runner_data: OutputBuiltinAdditionalData =
+        exec_scopes.get(vars::OUTPUT_RUNNER_DATA)?;
+    let fact_topologies: &mut Vec<FactTopology> = exec_scopes.get_mut_ref(vars::FACT_TOPOLOGIES)?;
+
+    let pre_execution_builtin_ptrs_addr =
+        get_relocatable_from_var_name("pre_execution_builtin_ptrs", vm, ids_data, ap_tracking)?;
+    let return_builtin_ptrs_addr =
+        get_relocatable_from_var_name("return_builtin_ptrs", vm, ids_data, ap_tracking)?;
+
+    // The output field is the first one in the BuiltinData struct
+    let output_start = vm
+        .get_integer(pre_execution_builtin_ptrs_addr)?
+        .into_owned();
+    let output_end = vm.get_integer(return_builtin_ptrs_addr)?.into_owned();
+    let output_size = {
+        let output_size_felt = output_end - output_start;
+        output_size_felt
+            .to_usize()
+            .ok_or(MathError::Felt252ToUsizeConversion(Box::new(
+                output_size_felt,
+            )))
+    }?;
+
+    let output_builtin = vm.get_output_builtin()?;
+    let fact_topology =
+        get_program_task_fact_topology(output_size, &task, output_builtin, output_runner_data)
+            .map_err(Into::<HintError>::into)?;
+    fact_topologies.push(fact_topology);
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use rstest::{fixture, rstest};
@@ -82,6 +139,8 @@ mod tests {
     use crate::hint_processor::builtin_hint_processor::hint_utils::get_ptr_from_var_name;
     use crate::types::relocatable::Relocatable;
     use crate::utils::test_utils::*;
+    use crate::vm::runners::builtin_runner::{BuiltinRunner, OutputBuiltinRunner};
+    use crate::vm::runners::cairo_pie::{BuiltinAdditionalData, PublicMemoryPage};
 
     use super::*;
 
@@ -171,5 +230,72 @@ mod tests {
             vm.segments.segment_sizes[&(program_address.segment_index as usize)],
             expected_program_size
         );
+    }
+
+    #[rstest]
+    fn test_append_fact_topologies(fibonacci: Program) {
+        let task = Task {
+            program: fibonacci.clone(),
+        };
+
+        let mut vm = vm!();
+
+        // Allocate space for the pre-execution and return builtin structs (2 x 8 felts).
+        // The pre-execution struct starts at (1, 0) and the return struct at (1, 8).
+        // We only set the output values to 0 and 10, respectively, to get an output size of 10.
+        vm.segments = segments![((1, 0), 0), ((1, 8), 10),];
+        vm.run_context.fp = 16;
+        add_segments!(vm, 1);
+
+        let tree_structure = vec![1, 2, 3, 4];
+        let program_output_data = OutputBuiltinAdditionalData {
+            base: 0,
+            pages: HashMap::from([
+                (1, PublicMemoryPage { start: 0, size: 7 }),
+                (2, PublicMemoryPage { start: 7, size: 3 }),
+            ]),
+            attributes: HashMap::from([("gps_fact_topology".to_string(), tree_structure.clone())]),
+        };
+        let mut output_builtin = OutputBuiltinRunner::new(true);
+        output_builtin.set_state(program_output_data.clone());
+        output_builtin.initialize_segments(&mut vm.segments);
+        vm.builtin_runners
+            .push(BuiltinRunner::Output(output_builtin));
+
+        let ids_data = non_continuous_ids_data![
+            ("pre_execution_builtin_ptrs", -16),
+            ("return_builtin_ptrs", -8),
+        ];
+
+        let ap_tracking = ApTracking::new();
+
+        let mut exec_scopes = ExecutionScopes::new();
+
+        let output_runner_data = OutputBuiltinAdditionalData {
+            base: 0,
+            pages: HashMap::new(),
+            attributes: HashMap::new(),
+        };
+        exec_scopes.insert_value(vars::OUTPUT_RUNNER_DATA, output_runner_data.clone());
+        exec_scopes.insert_value(vars::TASK, task);
+        exec_scopes.insert_value(vars::FACT_TOPOLOGIES, Vec::<FactTopology>::new());
+
+        append_fact_topologies(&mut vm, &mut exec_scopes, &ids_data, &ap_tracking)
+            .expect("Hint failed unexpectedly");
+
+        // Check that the fact topology matches the data from the output builtin
+        let fact_topologies: Vec<FactTopology> = exec_scopes.get(vars::FACT_TOPOLOGIES).unwrap();
+        assert_eq!(fact_topologies.len(), 1);
+
+        let fact_topology = &fact_topologies[0];
+        assert_eq!(fact_topology.page_sizes, vec![0, 7, 3]);
+        assert_eq!(fact_topology.tree_structure, tree_structure);
+
+        // Check that the output builtin was updated
+        let output_builtin_additional_data = vm.get_output_builtin().unwrap().get_additional_data();
+        assert!(matches!(
+            output_builtin_additional_data,
+            BuiltinAdditionalData::Output(data) if data == output_runner_data,
+        ));
     }
 }

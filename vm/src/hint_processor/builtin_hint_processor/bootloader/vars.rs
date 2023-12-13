@@ -30,3 +30,6 @@ pub(crate) const PROGRAM_DATA_BASE: &str = "program_data_base";
 
 /// Address of current program.
 pub(crate) const PROGRAM_ADDRESS: &str = "program_address";
+
+/// Output builtin additional data.
+pub(crate) const OUTPUT_RUNNER_DATA: &str = "output_runner_data";
