@@ -29,6 +29,9 @@ impl Into<HintError> for ProgramLoaderError {
 ///
 /// Converts the builtin name to bytes then attempts to create a felt from
 /// these bytes. This function will fail if the builtin name is over 31 characters.
+///
+/// This is used by the loader to make the builtins used by the program to the Cairo
+/// code.
 fn builtin_to_felt(builtin: &BuiltinName) -> Result<Felt252, ProgramLoaderError> {
     // The Python implementation uses the builtin name without suffix
     let builtin_name = builtin
@@ -132,31 +135,25 @@ impl<'vm> ProgramLoader<'vm> {
         Ok(())
     }
 
-    // builtins = task.get_program().builtins
-    // n_builtins = len(builtins)
-    // program_data = task.get_program().data
-    //
-    // # Fill in the program header.
-    // header_address = program_header.address_
-    // # The program header ends with a list of builtins used by the program.
-    // header_size = builtins_offset + n_builtins
-    // # data_length does not include the data_length header field in the calculation.
-    // program_header.data_length = (header_size - 1) + len(program_data)
-    // program_header.program_main = task.get_program().main
-    // program_header.n_builtins = n_builtins
-    // # Fill in the builtin list in memory.
-    // # TODO(ilya, 18/12/2021): Use addr_of(ids.program_header.builtin_list) when available.
-    // builtins_address = header_address + builtins_offset
-    // for index, builtin in enumerate(builtins):
-    //     assert isinstance(builtin, str)
-    //     memory[builtins_address + index] = from_bytes(builtin.encode("ascii"))
-    //
-    // # Fill in the program code in memory.
-    // program_address = header_address + header_size
-    // for index, opcode in enumerate(program_data):
-    //     memory[program_address + index] = opcode
-    //
-    // return program_address, header_size + len(program_data)
+    /// Loads a Cairo program in the VM memory.
+    ///
+    /// Programs are loaded in two parts:
+    /// 1. The program header contains metadata (ex: entrypoint, program size,
+    ///    builtins used by the program).
+    /// 2. The program itself.
+    ///
+    /// Starting from `base_address`, the header contains the following fields:
+    /// 1. The size of the header
+    /// 2. The bootloader version
+    /// 3. The program entrypoint
+    /// 4. The number of builtins used by the program
+    /// 5. The list of builtins used (converted to felts) as a C-style array.
+    ///
+    /// * `base_address`: Where to load the program, see above.
+    /// * `program`: The program to load.
+    /// * `bootloader_version`: The bootloader version. Defaults to 0.
+    ///
+    /// Returns the address where the code of the program is loaded and the program size.
     pub fn load_program(
         &mut self,
         base_address: &Relocatable,
