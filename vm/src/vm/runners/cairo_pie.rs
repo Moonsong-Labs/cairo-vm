@@ -58,7 +58,7 @@ pub enum BuiltinAdditionalData {
     None,
 }
 
-#[derive(Serialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct CairoPie {
     pub metadata: CairoPieMetadata,
     #[serde(serialize_with = "serde_impl::serialize_memory")]
@@ -68,7 +68,7 @@ pub struct CairoPie {
     pub version: CairoPieVersion,
 }
 
-#[derive(Serialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct CairoPieMetadata {
     pub program: StrippedProgram,
     pub program_segment: SegmentInfo,
@@ -79,7 +79,7 @@ pub struct CairoPieMetadata {
     pub extra_segments: Vec<SegmentInfo>,
 }
 
-#[derive(Serialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct StrippedProgram {
     #[serde(serialize_with = "serde_impl::serialize_program_data")]
     pub data: Vec<MaybeRelocatable>,
@@ -91,7 +91,7 @@ pub struct StrippedProgram {
     pub prime: (),
 }
 
-#[derive(Serialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct CairoPieVersion {
     // Dummy field for serialization only.
     #[serde(serialize_with = "serde_impl::serialize_version")]
