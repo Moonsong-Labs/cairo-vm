@@ -104,7 +104,7 @@ fn maybe_relocatable_to_field_element(
 ///  
 ///     return compute_hash_chain([len(data_chain)] + data_chain)
 pub fn compute_program_hash_chain(
-    program: Program,
+    program: &Program,
     bootloader_version: usize,
 ) -> Result<FieldElement, ProgramHashError> {
     let program_main = program
@@ -199,7 +199,7 @@ mod tests {
                 .expect("Could not load program. Did you compile the sample programs? Run `make test` in the root directory.");
         let bootloader_version = 0;
 
-        let program_hash = compute_program_hash_chain(program, bootloader_version)
+        let program_hash = compute_program_hash_chain(&program, bootloader_version)
             .expect("Failed to compute program hash.");
 
         let program_hash_hex = format!("{:#x}", program_hash);
