@@ -89,7 +89,7 @@ fn pedersen_test() {
         (
             OUTPUT_BUILTIN_NAME.to_string(),
             BuiltinAdditionalData::Output(OutputBuiltinAdditionalData {
-                base: 0,
+                base: 2,
                 pages: HashMap::new(),
                 attributes: HashMap::new(),
             }),
