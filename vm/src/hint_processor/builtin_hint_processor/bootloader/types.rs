@@ -5,7 +5,9 @@ use serde::{de, Deserialize, Deserializer};
 use felt::Felt252;
 
 use crate::serde::deserialize_program::deserialize_and_parse_program;
+use crate::types::errors::program_errors::ProgramError;
 use crate::types::program::Program;
+use crate::vm::runners::cairo_pie::StrippedProgram;
 
 pub type BootloaderVersion = u64;
 
@@ -43,8 +45,8 @@ where
 }
 
 impl Task {
-    pub fn get_program(&self) -> &Program {
-        &self.program
+    pub fn get_program(&self) -> Result<StrippedProgram, ProgramError> {
+        self.program.get_stripped_program()
     }
 }
 

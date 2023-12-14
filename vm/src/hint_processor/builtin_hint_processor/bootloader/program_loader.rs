@@ -1,9 +1,9 @@
 use crate::hint_processor::builtin_hint_processor::bootloader::types::BootloaderVersion;
 use crate::serde::deserialize_program::BuiltinName;
-use crate::types::program::Program;
 use crate::types::relocatable::Relocatable;
 use crate::vm::errors::hint_errors::HintError;
 use crate::vm::errors::memory_errors::MemoryError;
+use crate::vm::runners::cairo_pie::StrippedProgram;
 use crate::vm::vm_memory::memory::Memory;
 use felt::Felt252;
 
@@ -11,16 +11,12 @@ use felt::Felt252;
 pub enum ProgramLoaderError {
     #[error(transparent)]
     Memory(#[from] MemoryError),
-
-    #[error("Program has no entrypoint")]
-    NoEntrypoint,
 }
 
 impl Into<HintError> for ProgramLoaderError {
     fn into(self) -> HintError {
         match self {
             ProgramLoaderError::Memory(e) => HintError::Memory(e),
-            _ => HintError::CustomHint(self.to_string().into_boxed_str()),
         }
     }
 }
@@ -82,7 +78,7 @@ impl<'vm> ProgramLoader<'vm> {
     fn load_header(
         &mut self,
         base_address: &Relocatable,
-        program: &Program,
+        program: &StrippedProgram,
         bootloader_version: Option<BootloaderVersion>,
     ) -> Result<usize, ProgramLoaderError> {
         // Map the header struct as memory addresses
@@ -92,7 +88,7 @@ impl<'vm> ProgramLoader<'vm> {
         let n_builtins_ptr = base_address + 3;
         let builtin_list_ptr = base_address + 4;
 
-        let program_data = &program.shared_program_data.data;
+        let program_data = &program.data;
 
         let builtins = &program.builtins;
         let n_builtins = builtins.len();
@@ -100,10 +96,7 @@ impl<'vm> ProgramLoader<'vm> {
 
         // data_length does not include the data_length header field in the calculation.
         let data_length = header_size - 1 + program_data.len();
-        let program_main = program
-            .shared_program_data
-            .main
-            .ok_or(ProgramLoaderError::NoEntrypoint)?;
+        let program_main = program.main;
 
         let bootloader_version = bootloader_version.unwrap_or(0);
 
@@ -126,9 +119,9 @@ impl<'vm> ProgramLoader<'vm> {
     fn load_code(
         &mut self,
         base_address: &Relocatable,
-        program: &Program,
+        program: &StrippedProgram,
     ) -> Result<(), ProgramLoaderError> {
-        for (index, opcode) in program.shared_program_data.data.iter().enumerate() {
+        for (index, opcode) in program.data.iter().enumerate() {
             self.memory.insert_value(base_address + index, opcode)?;
         }
 
@@ -157,7 +150,7 @@ impl<'vm> ProgramLoader<'vm> {
     pub fn load_program(
         &mut self,
         base_address: &Relocatable,
-        program: &Program,
+        program: &StrippedProgram,
         bootloader_version: Option<BootloaderVersion>,
     ) -> Result<LoadedProgram, ProgramLoaderError> {
         let header_size = self.load_header(base_address, program, bootloader_version)?;
@@ -167,7 +160,7 @@ impl<'vm> ProgramLoader<'vm> {
 
         Ok(LoadedProgram {
             code_address: program_address,
-            size: header_size + program.shared_program_data.data.len(),
+            size: header_size + program.data.len(),
         })
     }
 }
@@ -175,6 +168,7 @@ impl<'vm> ProgramLoader<'vm> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::types::program::Program;
     use crate::vm::vm_memory::memory_segments::MemorySegmentManager;
     use rstest::{fixture, rstest};
 
@@ -232,12 +226,12 @@ mod tests {
     fn check_loaded_header(
         memory: &Memory,
         header_address: Relocatable,
-        program: &Program,
+        program: &StrippedProgram,
         bootloader_version: BootloaderVersion,
     ) {
         let header_felts = memory.get_integer_range(header_address, 4).unwrap();
-        let expected_data_length = program.shared_program_data.data.len() + 3;
-        let program_main = program.shared_program_data.main.unwrap();
+        let expected_data_length = program.data.len() + 3;
+        let program_main = program.main;
         let n_builtins = program.builtins.len();
 
         assert_eq!(
@@ -260,6 +254,8 @@ mod tests {
 
     #[rstest]
     fn test_load_header(fibonacci: Program) {
+        let program = fibonacci.get_stripped_program().unwrap();
+
         let mut segments = MemorySegmentManager::new();
         let base_address = segments.add();
 
@@ -268,13 +264,13 @@ mod tests {
 
         let bootloader_version: BootloaderVersion = 0;
         program_loader
-            .load_header(&base_address, &fibonacci, Some(bootloader_version))
+            .load_header(&base_address, &program, Some(bootloader_version))
             .expect("Failed to load program header in memory");
 
         check_loaded_header(
             &segments.memory,
             base_address.clone(),
-            &fibonacci,
+            &program,
             bootloader_version,
         );
 
@@ -282,19 +278,20 @@ mod tests {
         check_loaded_builtins(&segments.memory, &vec![], builtin_list_ptr);
     }
 
-    fn check_loaded_program(memory: &Memory, code_address: Relocatable, program: &Program) {
+    fn check_loaded_program(memory: &Memory, code_address: Relocatable, program: &StrippedProgram) {
         let loaded_opcodes = memory
-            .get_continuous_range(code_address, program.shared_program_data.data.len())
+            .get_continuous_range(code_address, program.data.len())
             .expect("Program not loaded properly in memory");
 
-        for (loaded, original) in std::iter::zip(loaded_opcodes, &program.shared_program_data.data)
-        {
+        for (loaded, original) in std::iter::zip(loaded_opcodes, &program.data) {
             assert_eq!(loaded, *original);
         }
     }
 
     #[rstest]
     fn test_load_program(fibonacci: Program) {
+        let program = fibonacci.get_stripped_program().unwrap();
+
         let mut segments = MemorySegmentManager::new();
         let base_address = segments.add();
 
@@ -303,7 +300,7 @@ mod tests {
 
         let bootloader_version: BootloaderVersion = 0;
         let loaded_program = program_loader
-            .load_program(&base_address, &fibonacci, Some(bootloader_version))
+            .load_program(&base_address, &program, Some(bootloader_version))
             .expect("Failed to load program in memory");
 
         let header_size = builtins_offset + fibonacci.builtins.len();
@@ -314,12 +311,12 @@ mod tests {
             header_size + fibonacci.shared_program_data.data.len()
         );
 
-        check_loaded_program(&segments.memory, loaded_program.code_address, &fibonacci);
+        check_loaded_program(&segments.memory, loaded_program.code_address, &program);
 
         check_loaded_header(
             &segments.memory,
             base_address.clone(),
-            &fibonacci,
+            &program,
             bootloader_version,
         );
 

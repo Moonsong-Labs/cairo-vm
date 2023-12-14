@@ -22,9 +22,14 @@ use crate::types::errors::math_errors::MathError;
 use crate::types::exec_scope::ExecutionScopes;
 use crate::types::relocatable::Relocatable;
 use crate::vm::errors::hint_errors::HintError;
-use crate::vm::runners::cairo_pie::OutputBuiltinAdditionalData;
+use crate::vm::runners::cairo_pie::{OutputBuiltinAdditionalData, StrippedProgram};
 use crate::vm::vm_core::VirtualMachine;
 use crate::vm::vm_memory::memory::Memory;
+
+fn get_program_from_task(task: &Task) -> Result<StrippedProgram, HintError> {
+    task.get_program()
+        .map_err(|e| HintError::CustomHint(e.to_string().into_boxed_str()))
+}
 
 /// Implements %{ ids.program_data_ptr = program_data_base = segments.add() %}.
 ///
@@ -65,7 +70,7 @@ pub fn load_program_hint(
 ) -> Result<(), HintError> {
     let program_data_base: Relocatable = exec_scopes.get(vars::PROGRAM_DATA_BASE)?;
     let task: Task = exec_scopes.get(vars::TASK)?;
-    let program = task.get_program();
+    let program = get_program_from_task(&task)?;
 
     let program_header_ptr = get_ptr_from_var_name("program_header", vm, ids_data, ap_tracking)?;
 
@@ -74,7 +79,7 @@ pub fn load_program_hint(
     let mut program_loader = ProgramLoader::new(&mut vm.segments.memory, builtins_offset);
     let bootloader_version: BootloaderVersion = 0;
     let loaded_program = program_loader
-        .load_program(&program_header_ptr, program, Some(bootloader_version))
+        .load_program(&program_header_ptr, &program, Some(bootloader_version))
         .map_err(Into::<HintError>::into)?;
 
     vm.segments.finalize(
@@ -157,7 +162,7 @@ pub fn validate_hash(
     ap_tracking: &ApTracking,
 ) -> Result<(), HintError> {
     let task: Task = exec_scopes.get(vars::TASK)?;
-    let program = task.get_program();
+    let program = get_program_from_task(&task)?;
 
     let output_ptr = get_ptr_from_var_name("output_ptr", vm, ids_data, ap_tracking)?;
     let program_hash_ptr = (output_ptr + 1)?;
@@ -169,7 +174,7 @@ pub fn validate_hash(
         .into_owned();
 
     // Compute the hash of the program
-    let computed_program_hash = compute_program_hash_chain(program, 0)
+    let computed_program_hash = compute_program_hash_chain(&program, 0)
         .map_err(|e| {
             HintError::CustomHint(format!("Could not compute program hash: {e}").into_boxed_str())
         })?
@@ -258,7 +263,8 @@ pub fn write_return_builtins_hint(
     let n_builtins: usize = exec_scopes.get(vars::N_BUILTINS)?;
 
     // builtins = task.get_program().builtins
-    let builtins = &task.get_program().builtins;
+    let program = get_program_from_task(&task)?;
+    let builtins = &program.builtins;
 
     // write_return_builtins(
     //     memory=memory, return_builtins_addr=ids.return_builtin_ptrs.address_,
@@ -507,7 +513,7 @@ mod tests {
         let ap_tracking = ApTracking::new();
 
         let mut exec_scopes = ExecutionScopes::new();
-        let n_builtins = task.get_program().builtins.len();
+        let n_builtins = field_arithmetic_program.builtins.len();
         exec_scopes.insert_value(vars::N_BUILTINS, n_builtins);
         exec_scopes.insert_value(vars::TASK, task);
 
