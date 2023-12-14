@@ -368,9 +368,7 @@ mod tests {
 
     #[rstest]
     fn test_load_program(fibonacci: Program) {
-        let task = Task {
-            program: fibonacci.clone(),
-        };
+        let task = Task::Program(fibonacci.clone());
 
         let mut vm = vm!();
         vm.run_context.fp = 1;
@@ -409,9 +407,7 @@ mod tests {
 
     #[rstest]
     fn test_append_fact_topologies(fibonacci: Program) {
-        let task = Task {
-            program: fibonacci.clone(),
-        };
+        let task = Task::Program(fibonacci.clone());
 
         let mut vm = vm!();
 
@@ -476,9 +472,7 @@ mod tests {
 
     #[rstest]
     fn test_write_output_builtins(field_arithmetic_program: Program) {
-        let task = Task {
-            program: field_arithmetic_program.clone(),
-        };
+        let task = Task::Program(field_arithmetic_program.clone());
 
         let mut vm = vm!();
         // Allocate space for all the builtin list structs (3 x 8 felts).
