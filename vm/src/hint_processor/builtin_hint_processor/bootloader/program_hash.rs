@@ -93,7 +93,7 @@ fn maybe_relocatable_to_field_element(
 }
 
 #[allow(dead_code)] // TODO: remove
-/// Computes the hash of a program.
+/// Computes the Pedersen hash of a program.
 ///
 /// Reimplements this Python function:
 /// def compute_program_hash_chain(program: ProgramBase, bootloader_version=0):
