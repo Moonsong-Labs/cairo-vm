@@ -1,16 +1,17 @@
-use crate::hint_processor::builtin_hint_processor::bootloader::program_hash::compute_program_hash_chain;
-use crate::types::errors::math_errors::MathError;
-use crate::types::relocatable::Relocatable;
-use felt::Felt252;
-use num_traits::ToPrimitive;
-use starknet_crypto::FieldElement;
 use std::any::Any;
 use std::collections::HashMap;
+
+use num_traits::ToPrimitive;
+use starknet_crypto::FieldElement;
+
+use felt::Felt252;
 
 use crate::any_box;
 use crate::hint_processor::builtin_hint_processor::bootloader::fact_topologies::{
     get_program_task_fact_topology, FactTopology,
 };
+use crate::hint_processor::builtin_hint_processor::bootloader::load_cairo_pie::load_cairo_pie;
+use crate::hint_processor::builtin_hint_processor::bootloader::program_hash::compute_program_hash_chain;
 use crate::hint_processor::builtin_hint_processor::bootloader::program_loader::ProgramLoader;
 use crate::hint_processor::builtin_hint_processor::bootloader::types::{BootloaderVersion, Task};
 use crate::hint_processor::builtin_hint_processor::bootloader::vars;
@@ -19,7 +20,9 @@ use crate::hint_processor::builtin_hint_processor::hint_utils::{
 };
 use crate::hint_processor::hint_processor_definition::HintReference;
 use crate::serde::deserialize_program::{ApTracking, BuiltinName};
+use crate::types::errors::math_errors::MathError;
 use crate::types::exec_scope::ExecutionScopes;
+use crate::types::relocatable::Relocatable;
 use crate::vm::errors::hint_errors::HintError;
 use crate::vm::runners::cairo_pie::{CairoPie, OutputBuiltinAdditionalData, StrippedProgram};
 use crate::vm::vm_core::VirtualMachine;
@@ -29,8 +32,6 @@ fn get_program_from_task(task: &Task) -> Result<StrippedProgram, HintError> {
     task.get_program()
         .map_err(|e| HintError::CustomHint(e.to_string().into_boxed_str()))
 }
-
-use self::util::load_cairo_pie;
 
 /// Implements %{ ids.program_data_ptr = program_data_base = segments.add() %}.
 ///
@@ -391,19 +392,21 @@ pub fn call_task(
     let mut new_task_locals = HashMap::new();
 
     // TODO: remove clone here when RunProgramTask has proper variant data (not String)
-    match task.clone() {
+    match &task {
         // if isinstance(task, RunProgramTask):
-        Task::Program(program_input) => {
+        Task::Program(_program) => {
+            let program_input = HashMap::<String, Box<dyn Any>>::new();
             // new_task_locals['program_input'] = task.program_input
             new_task_locals.insert("program_input".to_string(), any_box![program_input]);
             // new_task_locals['WITH_BOOTLOADER'] = True
             new_task_locals.insert("WITH_BOOTLOADER".to_string(), any_box![true]);
 
-            // TODO:
+            // TODO: the content of this function is mostly useless for the Rust VM.
+            //       check with SW if there is nothing of interest here.
             // vm_load_program(task.program, program_address)
         }
         // elif isinstance(task, CairoPieTask):
-        Task::Pie(task) => {
+        Task::Pie(cairo_pie) => {
             let program_address: Relocatable = exec_scopes.get("program_address")?;
 
             // ret_pc = ids.ret_pc_label.instruction_offset_ - ids.call_task.instruction_offset_ + pc
@@ -412,13 +415,14 @@ pub fn call_task(
             //     program_address=program_address, execution_segment_address= ap - n_builtins,
             //     builtin_runners=builtin_runners, ret_fp=fp, ret_pc=ret_pc)
             load_cairo_pie(
-                &task,
+                cairo_pie,
                 vm,
                 program_address,
                 (vm.get_ap() - num_builtins)?,
                 vm.get_fp(),
                 vm.get_pc(),
-            )?;
+            )
+            .map_err(Into::<HintError>::into)?;
         }
     }
 
@@ -445,213 +449,13 @@ pub fn call_task(
 }
 
 mod util {
-    use crate::{
-        types::relocatable::{relocate_address, relocate_value, MaybeRelocatable},
-        vm::runners::{
-            builtin_runner::{
-                BuiltinRunner, OutputBuiltinRunner, SignatureBuiltinRunner, SIGNATURE_BUILTIN_NAME,
-            },
-            cairo_pie::{BuiltinAdditionalData, OutputBuiltinAdditionalData},
-        },
+    use crate::vm::runners::{
+        builtin_runner::OutputBuiltinRunner,
+        cairo_pie::{BuiltinAdditionalData, OutputBuiltinAdditionalData},
     };
 
     // TODO: clean up / organize
     use super::*;
-
-    pub(crate) fn load_cairo_pie(
-        task: &CairoPie,
-        vm: &mut VirtualMachine,
-        program_address: Relocatable,
-        execution_segment_address: Relocatable,
-        ret_fp: Relocatable,
-        ret_pc: Relocatable,
-    ) -> Result<(), HintError> {
-        // Load memory entries of the inner program.
-        // This replaces executing hints in a non-trusted program.
-        // We use a Vec as a mapping of usize -> usize to represent a relocation table, as used in
-        // relocate_address() below. However, we also define an insertion fn to ensure "write-once"
-        // behavior
-        const RELOCATABLE_TABLE_SIZE: usize = 256;
-        let mut segment_offsets = vec![0usize; RELOCATABLE_TABLE_SIZE];
-        let mut segment_offsets_written = vec![false; RELOCATABLE_TABLE_SIZE];
-        let mut write_once = |k: usize, v: usize| {
-            if k >= RELOCATABLE_TABLE_SIZE {
-                return Err(HintError::CustomHint(
-                    format!("WriteOnce OOB (k: {}, v: {})", k, v)
-                        .to_string()
-                        .into_boxed_str(),
-                ));
-            }
-
-            return if segment_offsets_written[k] {
-                Err(HintError::CustomHint(
-                    format!("WriteOnce violation for k: {}, v: {}", k, v)
-                        .to_string()
-                        .into_boxed_str(),
-                ))
-            } else {
-                segment_offsets[k] = v;
-                segment_offsets_written[k] = true;
-                Ok(())
-            };
-        };
-
-        write_once(
-            task.metadata.program_segment.index as usize,
-            program_address.segment_index as usize,
-        )?;
-        write_once(
-            task.metadata.execution_segment.index as usize,
-            execution_segment_address.segment_index as usize,
-        )?;
-        write_once(
-            task.metadata.ret_fp_segment.index as usize,
-            ret_fp.segment_index as usize,
-        )?;
-        write_once(
-            task.metadata.ret_pc_segment.index as usize,
-            ret_pc.segment_index as usize,
-        )?;
-
-        // Returns the segment index for the given value.
-        // Verifies that value is a RelocatableValue with offset 0.
-        let extract_segment = |value, _value_name| -> Result<isize, HintError> {
-            return match value {
-                MaybeRelocatable::RelocatableValue(r) if r.offset != 0 => {
-                    Err(HintError::WrongHintData)
-                } // TODO: error
-                MaybeRelocatable::RelocatableValue(r) if r.offset == 0 => Ok(r.segment_index),
-                _ => Err(HintError::WrongHintData), // TODO: error
-            };
-        };
-
-        let origin_execution_segment = Relocatable {
-            segment_index: task.metadata.execution_segment.index,
-            offset: 0,
-        };
-
-        // Set initial stack relocations.
-        let mut idx = 0;
-        for builtin in task.metadata.program.builtins.iter() {
-            // task.memory is a CairoPieMemory, aka Vec<((usize, usize), MaybeRelocatable)>
-            // Assumptions:
-            //     * the (usize, usize) is a (segment_index, offset) pair
-            //     * the Vec's order and packing is arbitrary, so we scan for matches
-            let key: Relocatable = (origin_execution_segment + idx)?;
-            let pie_mem_element = task
-                .memory
-                .iter()
-                .find_map(|entry| {
-                    return if entry.0 == (key.segment_index as usize, key.offset) {
-                        Some(entry.1.clone())
-                    } else {
-                        None
-                    };
-                })
-                .ok_or(HintError::EmptyKeys)?; // TODO: proper error
-
-            let index = extract_segment(pie_mem_element, builtin)? as usize;
-            assert!(index < RELOCATABLE_TABLE_SIZE);
-
-            let mem_at = (execution_segment_address + idx)?;
-            write_once(index, vm.get_relocatable(mem_at)?.segment_index as usize)?;
-            idx += 1;
-        }
-
-        for segment_info in &task.metadata.extra_segments {
-            let index = segment_info.index as usize;
-            assert!(index < RELOCATABLE_TABLE_SIZE);
-            // TODO: previous passed 'size' to add()
-            write_once(index, vm.add_memory_segment().segment_index as usize)?;
-        }
-
-        let local_relocate_value = |value| -> Result<usize, HintError> {
-            relocate_address(value, &segment_offsets)
-                .map_err(|e| HintError::CustomHint(format!("Memory error: {}", e).into_boxed_str()))
-        };
-
-        let extend_additional_data = |data: &HashMap<Relocatable, (Felt252, Felt252)>,
-                                      builtin: &mut SignatureBuiltinRunner|
-         -> Result<(), HintError> {
-            for (addr, signature) in data {
-                let relocated_addr = local_relocate_value(*addr)?;
-                if relocated_addr != builtin.base() {
-                    return Err(HintError::CustomHint(
-                        format!(
-                            "expected relocated addr ({}) to equal builtin ({})",
-                            relocated_addr,
-                            builtin.base()
-                        )
-                        .into_boxed_str(),
-                    ));
-                }
-                builtin.add_signature(*addr, signature).map_err(|e| {
-                    HintError::CustomHint(format!("Memory error: {}", e).into_boxed_str())
-                })?;
-            }
-
-            Ok(())
-        };
-
-        // Relocate builtin additional data.
-        // This should occur before the memory relocation, since the signature builtin assumes that a
-        // signature is added before the corresponding public key and message are both written to memory.
-        let ecdsa_additional_data = task.additional_data.get("ecdsa_builtin");
-        if let Some(ecdsa_additional_data) = ecdsa_additional_data {
-            let ecdsa_builtin = vm
-                .get_builtin_runners_as_mut()
-                .iter_mut()
-                .find(|builtin: &&mut BuiltinRunner| builtin.name() == SIGNATURE_BUILTIN_NAME)
-                .ok_or(HintError::CustomHint(
-                    "The task requires the ecdsa builtin but it is missing."
-                        .to_string()
-                        .into_boxed_str(),
-                ))?;
-
-            let signature_additional_data =
-                if let BuiltinAdditionalData::Signature(ecdsa_additional_data) =
-                    ecdsa_additional_data
-                {
-                    Ok(ecdsa_additional_data)
-                } else {
-                    Err(HintError::CustomHint(
-                        "ECDSA builtin data should be of type Signature"
-                            .to_string()
-                            .into_boxed_str(),
-                    ))
-                }?;
-
-            match ecdsa_builtin {
-                BuiltinRunner::Signature(signature) => Ok(extend_additional_data(
-                    signature_additional_data,
-                    signature,
-                )?),
-                // TODO: better way to express this
-                _ => Err(HintError::CustomHint(
-                    "Unreachable".to_string().into_boxed_str(),
-                )),
-            }?;
-        }
-
-        // Relocate memory segment
-        for item in &task.memory {
-            let (segment_index, offset) = item.0;
-            let segment_index = segment_index as isize;
-
-            let value = item.1.clone();
-            let value = relocate_value(value, &segment_offsets)?;
-            // TODO: previous impl checked prime number
-            vm.segments.memory.insert(
-                Relocatable {
-                    segment_index,
-                    offset,
-                },
-                value,
-            )?;
-        }
-
-        Ok(())
-    }
 
     /// Prepares the output builtin if the type of task is Task, so that pages of the inner program
     /// will be recorded separately.
@@ -683,9 +487,11 @@ mod util {
 
 #[cfg(test)]
 mod tests {
-    use rstest::{fixture, rstest};
+    use std::path::Path;
 
     use assert_matches::assert_matches;
+    use rstest::{fixture, rstest};
+
     use felt::Felt252;
 
     use crate::any_box;
@@ -746,6 +552,13 @@ mod tests {
 
         Program::from_bytes(&program_content, Some("main"))
             .expect("Loading example program failed unexpectedly")
+    }
+
+    #[fixture]
+    fn fibonacci_pie() -> CairoPie {
+        let pie_file =
+            Path::new("../cairo_programs/manually_compiled/fibonacci_cairo_pie/fibonacci_pie.zip");
+        CairoPie::from_file(pie_file).expect("Failed to load the program PIE")
     }
 
     #[fixture]
@@ -827,6 +640,47 @@ mod tests {
             ),
             Ok(())
         );
+    }
+
+    #[rstest]
+    fn test_call_cairo_pie_task(fibonacci_pie: CairoPie) {
+        let mut vm = vm!();
+
+        // We set the program header pointer at (1, 0) and make it point to the start of segment #2.
+        // Allocate space for pre-execution (8 values), which follows the `BuiltinData` struct in
+        // the Bootloader Cairo code. Our code only uses the first felt (`output` field in the
+        // struct). Finally, we put the mocked output of `select_input_builtins` in the next
+        // memory address and increase the AP register accordingly.
+        vm.segments = segments![((1, 0), (2, 0)), ((1, 1), 42), ((1, 9), (4, 0))];
+        vm.run_context.ap = 10;
+        vm.run_context.fp = 9;
+        add_segments!(vm, 3);
+
+        let program_header_ptr = Relocatable::from((2, 0));
+        let ids_data = non_continuous_ids_data![
+            ("program_header", -9),
+            (vars::PRE_EXECUTION_BUILTIN_PTRS, -8),
+        ];
+        let ap_tracking = ApTracking::new();
+
+        let mut exec_scopes = ExecutionScopes::new();
+
+        let mut output_builtin = OutputBuiltinRunner::new(true);
+        output_builtin.initialize_segments(&mut vm.segments);
+        vm.builtin_runners
+            .push(BuiltinRunner::Output(output_builtin));
+
+        let task = Task::Pie(fibonacci_pie);
+        exec_scopes.insert_value(vars::TASK, task);
+        exec_scopes.insert_value(vars::PROGRAM_DATA_BASE, program_header_ptr.clone());
+
+        // Load the program in memory
+        load_program_hint(&mut vm, &mut exec_scopes, &ids_data, &ap_tracking)
+            .expect("Failed to load Cairo PIE task in the VM memory");
+
+        // Execute it
+        call_task(&mut vm, &mut exec_scopes, &ids_data, &ap_tracking)
+            .expect("Hint failed unexpectedly");
     }
 
     #[rstest]
