@@ -36,8 +36,8 @@ pub fn prepare_task_range_checks(
     ap_tracking: &ApTracking,
 ) -> Result<(), HintError> {
     // n_tasks = len(simple_bootloader_input.tasks)
-    let simple_bootloader_input: SimpleBootloaderInput =
-        exec_scopes.get(vars::SIMPLE_BOOTLOADER_INPUT)?;
+    let simple_bootloader_input: &SimpleBootloaderInput =
+        exec_scopes.get_ref(vars::SIMPLE_BOOTLOADER_INPUT)?;
     let n_tasks = simple_bootloader_input.tasks.len();
 
     // memory[ids.output_ptr] = n_tasks
@@ -67,9 +67,9 @@ pub fn prepare_task_range_checks(
 /// Implements
 /// %{ tasks = simple_bootloader_input.tasks %}
 pub fn set_tasks_variable(exec_scopes: &mut ExecutionScopes) -> Result<(), HintError> {
-    let simple_bootloader_input: SimpleBootloaderInput =
-        exec_scopes.get(vars::SIMPLE_BOOTLOADER_INPUT)?;
-    exec_scopes.insert_value(vars::TASKS, simple_bootloader_input.tasks);
+    let simple_bootloader_input: &SimpleBootloaderInput =
+        exec_scopes.get_ref(vars::SIMPLE_BOOTLOADER_INPUT)?;
+    exec_scopes.insert_value(vars::TASKS, simple_bootloader_input.tasks.clone());
 
     Ok(())
 }
@@ -110,8 +110,8 @@ pub fn set_current_task(
     ids_data: &HashMap<String, HintReference>,
     ap_tracking: &ApTracking,
 ) -> Result<(), HintError> {
-    let simple_bootloader_input: SimpleBootloaderInput =
-        exec_scopes.get(vars::SIMPLE_BOOTLOADER_INPUT)?;
+    let simple_bootloader_input: &SimpleBootloaderInput =
+        exec_scopes.get_ref(vars::SIMPLE_BOOTLOADER_INPUT)?;
     let n_tasks_felt =
         get_integer_from_var_name("n_tasks", vm, ids_data, ap_tracking)?.into_owned();
     let n_tasks = n_tasks_felt

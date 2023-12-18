@@ -55,7 +55,7 @@ pub fn prepare_simple_bootloader_output_segment(
 ) -> Result<(), HintError> {
     // Python: bootloader_input = BootloaderInput.Schema().load(program_input)
     // -> Assert that the bootloader input has been loaded when setting up the VM
-    let _bootloader_input: BootloaderInput = exec_scopes.get(vars::BOOTLOADER_INPUT)?;
+    let _bootloader_input: &BootloaderInput = exec_scopes.get_ref(vars::BOOTLOADER_INPUT)?;
 
     // Python: ids.simple_bootloader_output_start = segments.add()
     let new_segment_base = vm.add_memory_segment();
@@ -282,8 +282,8 @@ Implements hint:
 %}
 */
 pub fn save_packed_outputs(exec_scopes: &mut ExecutionScopes) -> Result<(), HintError> {
-    let bootloader_input: BootloaderInput = exec_scopes.get("bootloader_input")?;
-    let packed_outputs = bootloader_input.packed_outputs;
+    let bootloader_input: &BootloaderInput = exec_scopes.get_ref("bootloader_input")?;
+    let packed_outputs = bootloader_input.packed_outputs.clone();
     exec_scopes.insert_value("packed_outputs", packed_outputs);
     Ok(())
 }
@@ -318,7 +318,6 @@ pub fn compute_and_configure_fact_topologies(
     vm: &mut VirtualMachine,
     exec_scopes: &mut ExecutionScopes,
 ) -> Result<(), HintError> {
-    let bootloader_input: BootloaderInput = exec_scopes.get(vars::BOOTLOADER_INPUT)?;
     let packed_outputs: Vec<PackedOutput> = exec_scopes.get(vars::PACKED_OUTPUTS)?;
     let fact_topologies: Vec<FactTopology> = exec_scopes.get(vars::FACT_TOPOLOGIES)?;
     let mut output_start: Relocatable = exec_scopes.get(vars::OUTPUT_START)?;
@@ -332,7 +331,8 @@ pub fn compute_and_configure_fact_topologies(
 
     exec_scopes.insert_value(vars::OUTPUT_START, output_start);
 
-    if let Some(path) = bootloader_input
+    let bootloader_input: &BootloaderInput = exec_scopes.get_ref(vars::BOOTLOADER_INPUT)?;
+    if let Some(path) = &bootloader_input
         .simple_bootloader_input
         .fact_topologies_path
     {
