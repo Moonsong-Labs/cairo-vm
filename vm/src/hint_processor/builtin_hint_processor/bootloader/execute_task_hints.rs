@@ -22,7 +22,7 @@ use crate::types::errors::math_errors::MathError;
 use crate::types::exec_scope::ExecutionScopes;
 use crate::types::relocatable::Relocatable;
 use crate::vm::errors::hint_errors::HintError;
-use crate::vm::runners::cairo_pie::{OutputBuiltinAdditionalData, StrippedProgram};
+use crate::vm::runners::cairo_pie::{CairoPie, OutputBuiltinAdditionalData, StrippedProgram};
 use crate::vm::vm_core::VirtualMachine;
 use crate::vm::vm_memory::memory::Memory;
 
@@ -204,6 +204,39 @@ const ALL_BUILTINS: [BuiltinName; 8] = [
     BuiltinName::poseidon,
 ];
 
+fn check_cairo_pie_builtin_usage(
+    memory: &mut Memory,
+    builtin: &BuiltinName,
+    builtin_index: usize,
+    cairo_pie: &CairoPie,
+    return_builtins_addr: &Relocatable,
+    pre_execution_builtins_addr: &Relocatable,
+) -> Result<(), HintError> {
+    let return_builtin_value = memory
+        .get_integer(return_builtins_addr + builtin_index)?
+        .into_owned();
+    let pre_execution_builtin_value = memory
+        .get_integer(pre_execution_builtins_addr + builtin_index)?
+        .into_owned();
+    let expected_builtin_size = return_builtin_value - pre_execution_builtin_value;
+
+    let builtin_name = builtin
+        .name()
+        .strip_suffix("_builtin")
+        .unwrap_or(builtin.name());
+    let builtin_size = Felt252::from(cairo_pie.metadata.builtin_segments[builtin_name].size);
+
+    if builtin_size != expected_builtin_size {
+        return Err(HintError::AssertionFailed(
+            "Builtin usage is inconsistent with the CairoPie."
+                .to_string()
+                .into_boxed_str(),
+        ));
+    }
+
+    Ok(())
+}
+
 /// Writes the updated builtin pointers after the program execution to the given return builtins
 /// address.
 ///     
@@ -214,7 +247,7 @@ fn write_return_builtins(
     used_builtins: &[BuiltinName],
     used_builtins_addr: &Relocatable,
     pre_execution_builtins_addr: &Relocatable,
-    _task: &Task,
+    task: &Task,
 ) -> Result<(), HintError> {
     let mut used_builtin_offset: usize = 0;
     for (index, builtin) in ALL_BUILTINS.iter().enumerate() {
@@ -225,7 +258,16 @@ fn write_return_builtins(
             memory.insert_value(return_builtins_addr + index, builtin_value)?;
             used_builtin_offset += 1;
 
-            // TODO: if isinstance(task, CairoPie) check
+            if let Task::Pie(cairo_pie) = task {
+                check_cairo_pie_builtin_usage(
+                    memory,
+                    builtin,
+                    index,
+                    cairo_pie,
+                    return_builtins_addr,
+                    pre_execution_builtins_addr,
+                )?;
+            }
         }
         // The builtin is unused, hence its value is the same as before calling the program.
         else {
