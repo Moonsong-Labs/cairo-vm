@@ -19,12 +19,20 @@ pub struct BootloaderConfig {
 
 #[derive(Deserialize, Debug, Clone, PartialEq)]
 pub struct CompositePackedOutput {
+    pub outputs: Vec<Felt252>,
     pub subtasks: Vec<PackedOutput>,
+}
+
+impl CompositePackedOutput {
+    pub fn elements_for_hash(&self) -> &Vec<Felt252> {
+        &self.outputs
+    }
 }
 
 impl Default for CompositePackedOutput {
     fn default() -> Self {
         Self {
+            outputs: Default::default(),
             subtasks: Default::default(),
         }
     }
@@ -34,13 +42,6 @@ impl Default for CompositePackedOutput {
 pub enum PackedOutput {
     Plain(Vec<Felt252>),
     Composite(CompositePackedOutput),
-}
-
-impl PackedOutput {
-    // TODO: implement and define return type
-    pub fn elements_for_hash(&self) -> Vec<()> {
-        Default::default()
-    }
 }
 
 #[derive(Deserialize, Debug, Clone, PartialEq)]

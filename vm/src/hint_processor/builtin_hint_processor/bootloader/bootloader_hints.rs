@@ -4,11 +4,10 @@ use std::collections::HashMap;
 use crate::hint_processor::builtin_hint_processor::bootloader::fact_topologies::{
     compute_fact_topologies, configure_fact_topologies, write_to_fact_topologies_file, FactTopology,
 };
-use felt::Felt252;
 use num_traits::ToPrimitive;
 
 use crate::hint_processor::builtin_hint_processor::bootloader::types::{
-    BootloaderInput, PackedOutput,
+    BootloaderInput, CompositePackedOutput, PackedOutput,
 };
 use crate::hint_processor::builtin_hint_processor::bootloader::vars;
 
@@ -343,6 +342,19 @@ pub fn compute_and_configure_fact_topologies(
     Ok(())
 }
 
+fn unwrap_composite_output(
+    packed_output: PackedOutput,
+) -> Result<CompositePackedOutput, HintError> {
+    match packed_output {
+        PackedOutput::Plain(_) => Err(HintError::CustomHint(
+            "Expected packed output to be composite"
+                .to_string()
+                .into_boxed_str(),
+        )),
+        PackedOutput::Composite(composite_packed_output) => Ok(composite_packed_output),
+    }
+}
+
 /*
 Implements hint:
 %{
@@ -351,19 +363,10 @@ Implements hint:
 */
 pub fn set_packed_output_to_subtasks(exec_scopes: &mut ExecutionScopes) -> Result<(), HintError> {
     let packed_output: PackedOutput = exec_scopes.get(vars::PACKED_OUTPUT)?;
-    match packed_output {
-        PackedOutput::Plain(_) => {
-            return Err(HintError::CustomHint(
-                "Expected packed output to be composite"
-                    .to_string()
-                    .into_boxed_str(),
-            ))
-        }
-        PackedOutput::Composite(composite_packed_output) => {
-            let subtasks = composite_packed_output.subtasks;
-            exec_scopes.insert_value(vars::PACKED_OUTPUTS, subtasks);
-        }
-    }
+    let composite_packed_output = unwrap_composite_output(packed_output)?;
+    let subtasks = composite_packed_output.subtasks;
+    exec_scopes.insert_value(vars::PACKED_OUTPUTS, subtasks);
+
     Ok(())
 }
 
@@ -381,8 +384,10 @@ pub fn guess_pre_image_of_subtasks_output_hash(
     ids_data: &HashMap<String, HintReference>,
     ap_tracking: &ApTracking,
 ) -> Result<(), HintError> {
-    let packed_output = exec_scopes.get::<PackedOutput>("packed_output")?;
-    let data = packed_output.elements_for_hash();
+    let packed_output: PackedOutput = exec_scopes.get(vars::PACKED_OUTPUT)?;
+    let composite_packed_output = unwrap_composite_output(packed_output)?;
+
+    let data = composite_packed_output.elements_for_hash();
     insert_value_from_var_name(
         "nested_subtasks_output_len",
         data.len(),
@@ -390,14 +395,20 @@ pub fn guess_pre_image_of_subtasks_output_hash(
         ids_data,
         ap_tracking,
     )?;
-    // TODO: equivalent of 'segments.gen_arg'
+    let args = data
+        .iter()
+        .cloned()
+        .map(|x| Box::new(MaybeRelocatable::Int(x)) as Box<dyn Any>)
+        .collect();
+    let nested_subtasks_output = gen_arg(vm, &args)?;
     insert_value_from_var_name(
         "nested_subtasks_output",
-        Felt252::from(42),
+        nested_subtasks_output,
         vm,
         ids_data,
         ap_tracking,
     )?;
+
     Ok(())
 }
 
@@ -904,6 +915,7 @@ mod tests {
         exec_scopes.insert_value(
             vars::PACKED_OUTPUT,
             PackedOutput::Composite(CompositePackedOutput {
+                outputs: vec![],
                 subtasks: subtasks.clone(),
             }),
         );
@@ -939,7 +951,10 @@ mod tests {
 
         exec_scopes.insert_box(
             "packed_output",
-            Box::new(PackedOutput::Plain(Default::default())),
+            Box::new(PackedOutput::Composite(CompositePackedOutput {
+                outputs: vec![Felt252::from(42)],
+                subtasks: vec![],
+            })),
         );
 
         let ap_tracking = ApTracking::new();
@@ -957,13 +972,13 @@ mod tests {
             get_integer_from_var_name("nested_subtasks_output_len", &vm, &ids_data, &ap_tracking)
                 .expect("nested_subtasks_output_len should be set")
                 .into_owned();
-        assert_eq!(nested_subtasks_output_len, 0.into());
+        assert_eq!(nested_subtasks_output_len, 1.into());
 
         let nested_subtasks_output =
-            get_integer_from_var_name("nested_subtasks_output", &vm, &ids_data, &ap_tracking)
-                .expect("nested_subtasks_output should be set")
-                .into_owned();
-        assert_eq!(nested_subtasks_output, 42.into());
+            get_ptr_from_var_name("nested_subtasks_output", &vm, &ids_data, &ap_tracking)
+                .expect("nested_subtasks_output should be set");
+        let arg = vm.get_integer(nested_subtasks_output).unwrap().into_owned();
+        assert_eq!(arg, Felt252::from(42));
     }
 
     #[rstest]
