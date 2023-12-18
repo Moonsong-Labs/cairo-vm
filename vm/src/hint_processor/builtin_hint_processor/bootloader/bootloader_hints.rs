@@ -350,9 +350,20 @@ Implements hint:
 %}
 */
 pub fn set_packed_output_to_subtasks(exec_scopes: &mut ExecutionScopes) -> Result<(), HintError> {
-    let packed_outputs = exec_scopes.get::<Felt252>("packed_output")?; // TODO: need real type
-    let subtasks = packed_outputs; // TODO: need type for packed_output / query its subtasks field
-    exec_scopes.insert_value("packed_outputs", subtasks);
+    let packed_output: PackedOutput = exec_scopes.get(vars::PACKED_OUTPUT)?;
+    match packed_output {
+        PackedOutput::Plain(_) => {
+            return Err(HintError::CustomHint(
+                "Expected packed output to be composite"
+                    .to_string()
+                    .into_boxed_str(),
+            ))
+        }
+        PackedOutput::Composite(composite_packed_output) => {
+            let subtasks = composite_packed_output.subtasks;
+            exec_scopes.insert_value(vars::PACKED_OUTPUTS, subtasks);
+        }
+    }
     Ok(())
 }
 
@@ -427,7 +438,7 @@ mod tests {
     use std::ops::Add;
 
     use crate::hint_processor::builtin_hint_processor::bootloader::types::{
-        BootloaderConfig, SimpleBootloaderInput,
+        BootloaderConfig, CompositePackedOutput, SimpleBootloaderInput,
     };
     use felt::Felt252;
     use num_traits::ToPrimitive;
@@ -690,7 +701,7 @@ mod tests {
 
         let packed_outputs = vec![
             PackedOutput::Plain(vec![]),
-            PackedOutput::Composite(vec![]),
+            PackedOutput::Composite(CompositePackedOutput::default()),
             PackedOutput::Plain(vec![]),
         ];
         exec_scopes.insert_value(vars::PACKED_OUTPUTS, packed_outputs);
@@ -733,7 +744,7 @@ mod tests {
         }
 
         let plain_packed_output = PackedOutput::Plain(Vec::<Felt252>::new());
-        let composite_packed_output = PackedOutput::Composite(Vec::<Felt252>::new());
+        let composite_packed_output = PackedOutput::Composite(CompositePackedOutput::default());
 
         assert!(is_plain(&mut vm, &mut exec_scopes, plain_packed_output));
 
@@ -883,12 +894,19 @@ mod tests {
 
     #[test]
     fn test_set_packed_output_to_subtasks() {
-        use felt::Felt252;
-
         let mut vm = vm!();
         let mut exec_scopes = ExecutionScopes::new();
 
-        exec_scopes.insert_box("packed_output", Box::new(Felt252::from(42)));
+        let subtasks = vec![
+            PackedOutput::Plain(vec![]),
+            PackedOutput::Composite(CompositePackedOutput::default()),
+        ];
+        exec_scopes.insert_value(
+            vars::PACKED_OUTPUT,
+            PackedOutput::Composite(CompositePackedOutput {
+                subtasks: subtasks.clone(),
+            }),
+        );
 
         let hint_data = HintProcessorData::new_default(
             String::from(hint_code::BOOTLOADER_SET_PACKED_OUTPUT_TO_SUBTASKS),
@@ -905,11 +923,8 @@ mod tests {
             Ok(())
         );
 
-        let packed_outputs = exec_scopes.get::<Felt252>("packed_outputs");
-        assert_matches!(
-            packed_outputs,
-            Ok(x) if x == Felt252::from(42)
-        );
+        let packed_outputs: Vec<PackedOutput> = exec_scopes.get(vars::PACKED_OUTPUTS).unwrap();
+        assert_eq!(packed_outputs, subtasks);
     }
 
     #[test]
@@ -962,7 +977,7 @@ mod tests {
             Err(HintError::CustomHint(_))
         ));
 
-        let composite_packed_output = PackedOutput::Composite(Vec::<Felt252>::new());
+        let composite_packed_output = PackedOutput::Composite(CompositePackedOutput::default());
         exec_scopes.insert_value(vars::PACKED_OUTPUT, composite_packed_output);
         assert!(assert_is_composite_packed_output(&mut exec_scopes).is_ok());
     }

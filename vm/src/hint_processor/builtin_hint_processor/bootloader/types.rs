@@ -18,9 +18,22 @@ pub struct BootloaderConfig {
 }
 
 #[derive(Deserialize, Debug, Clone, PartialEq)]
+pub struct CompositePackedOutput {
+    pub subtasks: Vec<PackedOutput>,
+}
+
+impl Default for CompositePackedOutput {
+    fn default() -> Self {
+        Self {
+            subtasks: Default::default(),
+        }
+    }
+}
+
+#[derive(Deserialize, Debug, Clone, PartialEq)]
 pub enum PackedOutput {
     Plain(Vec<Felt252>),
-    Composite(Vec<Felt252>),
+    Composite(CompositePackedOutput),
 }
 
 impl PackedOutput {

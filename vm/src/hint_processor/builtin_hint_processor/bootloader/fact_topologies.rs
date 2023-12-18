@@ -376,7 +376,9 @@ pub fn write_to_fact_topologies_file<FT: AsRef<FactTopology>>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::hint_processor::builtin_hint_processor::bootloader::types::PackedOutput;
+    use crate::hint_processor::builtin_hint_processor::bootloader::types::{
+        CompositePackedOutput, PackedOutput,
+    };
     use crate::vm::runners::cairo_pie::PublicMemoryPage;
     use rstest::{fixture, rstest};
     use std::collections::HashMap;
@@ -423,7 +425,7 @@ mod tests {
     #[test]
     /// Composite outputs are not supported (yet).
     fn test_compute_fact_topologies_composite_output() {
-        let packed_outputs = vec![PackedOutput::Composite(vec![])];
+        let packed_outputs = vec![PackedOutput::Composite(CompositePackedOutput::default())];
         let fact_topologies = vec![FactTopology {
             tree_structure: vec![],
             page_sizes: vec![],
