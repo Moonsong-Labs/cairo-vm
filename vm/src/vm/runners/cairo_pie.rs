@@ -81,7 +81,7 @@ pub struct CairoPie {
 
 fn parse_zip_file<T: DeserializeOwned>(mut zip_file: ZipFile) -> Result<T, CairoPieError> {
     let mut buf = vec![];
-    zip_file.read_to_end(&mut buf).unwrap();
+    zip_file.read_to_end(&mut buf)?;
     serde_json::from_slice(&buf).map_err(|e| e.into())
 }
 
