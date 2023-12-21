@@ -1615,3 +1615,6 @@ ids.select_builtin = int(
   n_selected_builtins > 0 and memory[ids.selected_encodings] == memory[ids.all_encodings])
 if ids.select_builtin:
   n_selected_builtins = n_selected_builtins - 1";
+
+pub const SELECT_BUILTINS_ENTER_SCOPE: &str =
+    "vm_enter_scope({'n_selected_builtins': ids.n_selected_builtins})";

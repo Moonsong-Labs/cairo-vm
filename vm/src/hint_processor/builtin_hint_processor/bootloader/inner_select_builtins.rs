@@ -3,7 +3,7 @@ use std::collections::HashMap;
 
 use crate::hint_processor::builtin_hint_processor::bootloader::vars;
 use crate::hint_processor::builtin_hint_processor::hint_utils::{
-    get_integer_from_var_name, get_ptr_from_var_name, insert_value_from_var_name,
+    get_ptr_from_var_name, insert_value_from_var_name,
 };
 use crate::hint_processor::hint_processor_definition::HintReference;
 use crate::serde::deserialize_program::ApTracking;
@@ -62,6 +62,7 @@ pub fn select_builtin(
 mod tests {
     use rstest::rstest;
 
+    use crate::hint_processor::builtin_hint_processor::hint_utils::get_integer_from_var_name;
     use felt::Felt252;
 
     use crate::utils::test_utils::*;
