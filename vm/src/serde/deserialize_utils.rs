@@ -276,22 +276,26 @@ fn take_until_unbalanced(
     }
 }
 
-fn deserialize_scientific_notation(n: Number) -> Option<BigUint> {
+fn deserialize_scientific_notation(n: Number) -> Option<Felt252> {
     match n.as_f64() {
         None => {
             let str = n.to_string();
             let list: [&str; 2] = str.split('e').collect::<Vec<&str>>().try_into().ok()?;
 
             let exponent = list[1].parse::<u32>().ok()?;
-            let base = BigUint::parse_bytes(list[0].to_string().as_bytes(), 10)?;
-            Some(base * BigUint::from(10u64).pow(exponent))
+            let base = Felt252::parse_bytes(list[0].to_string().as_bytes(), 10)?;
+            Some(base * Felt252::from(10).pow(exponent))
         }
-        Some(float) => BigUint::parse_bytes(FloatCore::round(float).to_string().as_bytes(), 10),
+        Some(float) => Felt252::parse_bytes(FloatCore::round(float).to_string().as_bytes(), 10),
     }
 }
 
 pub(crate) fn biguint_from_number(n: Number) -> Option<BigUint> {
-    match BigUint::parse_bytes(n.to_string().as_bytes(), 10) {
+    BigUint::parse_bytes(n.to_string().as_bytes(), 10)
+}
+
+pub(crate) fn felt_from_number(n: Number) -> Option<Felt252> {
+    match Felt252::parse_bytes(n.to_string().as_bytes(), 10) {
         Some(x) => Some(x),
         None => {
             // Handle de Number with scientific notation cases
@@ -304,10 +308,6 @@ pub(crate) fn biguint_from_number(n: Number) -> Option<BigUint> {
             None
         }
     }
-}
-
-pub(crate) fn felt_from_number(n: Number) -> Option<Felt252> {
-    biguint_from_number(n).map(Felt252::from)
 }
 
 pub(crate) fn deserialize_biguint_from_number<'de, D>(deserializer: D) -> Result<BigUint, D::Error>
