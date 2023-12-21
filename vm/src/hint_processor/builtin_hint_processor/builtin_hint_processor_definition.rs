@@ -5,6 +5,7 @@ use crate::hint_processor::builtin_hint_processor::bootloader::execute_task_hint
     allocate_program_data_segment, append_fact_topologies, load_program_hint, validate_hash,
     write_return_builtins_hint,
 };
+use crate::hint_processor::builtin_hint_processor::bootloader::inner_select_builtins::select_builtin;
 use crate::hint_processor::builtin_hint_processor::bootloader::simple_bootloader_hints::{
     divide_num_by_2, prepare_task_range_checks, set_ap_to_zero, set_current_task,
     set_tasks_variable,
@@ -913,6 +914,9 @@ impl HintProcessorLogic for BuiltinHintProcessor {
             hint_code::EXECUTE_TASK_EXIT_SCOPE => exit_scope(exec_scopes),
             hint_code::EXECUTE_TASK_APPEND_FACT_TOPOLOGIES => {
                 append_fact_topologies(vm, exec_scopes, &hint_data.ids_data, &hint_data.ap_tracking)
+            }
+            hint_code::INNER_SELECT_BUILTINS_SELECT_BUILTIN => {
+                select_builtin(vm, exec_scopes, &hint_data.ids_data, &hint_data.ap_tracking)
             }
             #[cfg(feature = "skip_next_instruction_hint")]
             hint_code::SKIP_NEXT_INSTRUCTION => skip_next_instruction(vm),
