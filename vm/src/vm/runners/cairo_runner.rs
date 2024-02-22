@@ -14,7 +14,7 @@ use crate::{
     },
 };
 
-use crate::vm::runners::cairo_pie::CAIRO_PIE_VERSION;
+use crate::vm::runners::cairo_pie::{BuiltinAdditionalData, CAIRO_PIE_VERSION};
 use crate::Felt252;
 use crate::{
     hint_processor::hint_processor_definition::{HintProcessor, HintReference},
@@ -56,7 +56,7 @@ use num_traits::{ToPrimitive, Zero};
 use serde::{Deserialize, Serialize};
 
 use super::{
-    builtin_runner::{KeccakBuiltinRunner, PoseidonBuiltinRunner, OUTPUT_BUILTIN_NAME},
+    builtin_runner::{KeccakBuiltinRunner, PoseidonBuiltinRunner},
     cairo_pie::{self, CairoPie, CairoPieMetadata, CairoPieVersion},
 };
 
@@ -1091,8 +1091,8 @@ impl CairoRunner {
             let (_, size) = builtin_runner
                 .get_used_cells_and_allocated_size(vm)
                 .map_err(RunnerError::FinalizeSegements)?;
-            if builtin_runner.name() == OUTPUT_BUILTIN_NAME {
-                let public_memory = (0..size).map(|i| (i, 0)).collect();
+            if let BuiltinRunner::Output(output_builtin) = builtin_runner {
+                let public_memory = output_builtin.get_public_memory()?;
                 vm.segments
                     .finalize(Some(size), builtin_runner.base(), Some(&public_memory))
             } else {
@@ -1403,7 +1403,8 @@ impl CairoRunner {
                 .builtin_runners
                 .iter()
                 .map(|b| (b.name().to_string(), b.get_additional_data()))
-                .collect(),
+                .collect::<HashMap<String, BuiltinAdditionalData>>()
+                .into(),
             version: CairoPieVersion {
                 cairo_pie: CAIRO_PIE_VERSION.to_string(),
             },

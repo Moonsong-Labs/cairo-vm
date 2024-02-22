@@ -2,7 +2,7 @@ use crate::types::relocatable::{MaybeRelocatable, Relocatable};
 use crate::vm::errors::hint_errors::HintError;
 use crate::vm::errors::memory_errors::MemoryError;
 use crate::vm::runners::builtin_runner::SignatureBuiltinRunner;
-use crate::vm::runners::cairo_pie::{BuiltinAdditionalData, CairoPie, CairoPieMemory};
+use crate::vm::runners::cairo_pie::{CairoPie, CairoPieMemory};
 use crate::vm::vm_core::VirtualMachine;
 use crate::Felt252;
 use std::collections::HashMap;
@@ -27,9 +27,6 @@ pub enum SignatureRelocationError {
 
     #[error("The PIE requires ECDSA but the VM is not configured to use it")]
     EcdsaBuiltinNotFound,
-
-    #[error("The data of the Cairo PIE ECDSA builtin does not match the expected type")]
-    UnexpectedBuiltinDataType,
 
     #[error("Relocated signature data ({0} not on signature builtin segment {1}")]
     RelocatedDataNotOnBuiltinSegment(Relocatable, isize),
@@ -226,19 +223,16 @@ fn relocate_builtin_additional_data(
     vm: &mut VirtualMachine,
     relocation_table: &RelocationTable,
 ) -> Result<(), SignatureRelocationError> {
-    let ecdsa_additional_data = match cairo_pie.additional_data.get("ecdsa_builtin") {
-        Some(additional_data) => match additional_data {
-            BuiltinAdditionalData::Signature(data) => data,
-            _ => return Err(SignatureRelocationError::UnexpectedBuiltinDataType),
-        },
+    let ecdsa_additional_data = match &cairo_pie.additional_data.ecdsa_builtin {
         None => return Ok(()),
+        Some(data) => data,
     };
 
     let ecdsa_builtin = vm
         .get_signature_builtin()
         .map_err(|_| SignatureRelocationError::EcdsaBuiltinNotFound)?;
 
-    extend_additional_data(ecdsa_builtin, ecdsa_additional_data, relocation_table)?;
+    extend_additional_data(ecdsa_builtin, &ecdsa_additional_data.0, relocation_table)?;
 
     Ok(())
 }

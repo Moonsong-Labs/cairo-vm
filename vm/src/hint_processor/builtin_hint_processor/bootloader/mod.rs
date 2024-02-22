@@ -7,5 +7,5 @@ mod program_hash;
 mod program_loader;
 pub(crate) mod select_builtins;
 pub(crate) mod simple_bootloader_hints;
-pub(crate) mod types;
+pub mod types;
 pub(crate) mod vars;

@@ -19,13 +19,12 @@ use crate::{
             HASH_BUILTIN_NAME, OUTPUT_BUILTIN_NAME, RANGE_CHECK_BUILTIN_NAME,
             SIGNATURE_BUILTIN_NAME,
         },
-        cairo_pie::{
-            BuiltinAdditionalData, CairoPieMemory, OutputBuiltinAdditionalData, SegmentInfo,
-        },
+        cairo_pie::{CairoPieMemory, OutputBuiltinAdditionalData, SegmentInfo},
         cairo_runner::ExecutionResources,
     },
 };
 
+use crate::vm::runners::cairo_pie::{AdditionalData, SignatureBuiltinAdditionalData};
 #[cfg(all(not(feature = "std"), feature = "alloc"))]
 use alloc::{
     string::{String, ToString},
@@ -92,24 +91,15 @@ fn pedersen_test() {
     };
     assert_eq!(cairo_pie.execution_resources, expected_execution_resources);
     // additional_data
-    let expected_additional_data = HashMap::from([
-        (
-            OUTPUT_BUILTIN_NAME.to_string(),
-            BuiltinAdditionalData::Output(OutputBuiltinAdditionalData {
-                base: 2,
-                pages: HashMap::new(),
-                attributes: HashMap::new(),
-            }),
-        ),
-        (
-            HASH_BUILTIN_NAME.to_string(),
-            BuiltinAdditionalData::Hash(vec![Relocatable::from((3, 2))]),
-        ),
-        (
-            RANGE_CHECK_BUILTIN_NAME.to_string(),
-            BuiltinAdditionalData::None,
-        ),
-    ]);
+    let expected_additional_data = AdditionalData {
+        output_builtin: Some(OutputBuiltinAdditionalData {
+            base: 2,
+            pages: HashMap::new(),
+            attributes: HashMap::new(),
+        }),
+        pedersen_builtin: Some(vec![Relocatable::from((3, 2))]),
+        ..Default::default()
+    };
     assert_eq!(cairo_pie.additional_data, expected_additional_data);
     // memory
     assert_eq!(
@@ -171,9 +161,8 @@ fn common_signature() {
     };
     assert_eq!(cairo_pie.execution_resources, expected_execution_resources);
     // additional_data
-    let expected_additional_data = HashMap::from([(
-        SIGNATURE_BUILTIN_NAME.to_string(),
-        BuiltinAdditionalData::Signature(HashMap::from([(
+    let expected_additional_data = AdditionalData {
+        ecdsa_builtin: Some(SignatureBuiltinAdditionalData(HashMap::from([(
             Relocatable::from((2, 0)),
             (
                 felt_str!(
@@ -183,8 +172,10 @@ fn common_signature() {
                     "598673427589502599949712887611119751108407514580626464031881322743364689811"
                 ),
             ),
-        )])),
-    )]);
+        )]))),
+        ..Default::default()
+    };
+
     assert_eq!(cairo_pie.additional_data, expected_additional_data);
     // memory
     assert_eq!(

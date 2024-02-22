@@ -9,6 +9,9 @@ use super::cairo_runner::ExecutionResources;
 use crate::serde::deserialize_utils::deserialize_biguint_from_number;
 use crate::stdlib::prelude::{String, Vec};
 use crate::types::errors::cairo_pie_error::{CairoPieError, DeserializeMemoryError};
+use crate::vm::runners::builtin_runner::{
+    HASH_BUILTIN_NAME, OUTPUT_BUILTIN_NAME, SIGNATURE_BUILTIN_NAME,
+};
 use crate::{
     serde::deserialize_program::BuiltinName,
     stdlib::{collections::HashMap, prelude::*},
@@ -66,6 +69,15 @@ pub struct OutputBuiltinAdditionalData {
     pub attributes: Attributes,
 }
 
+#[derive(Serialize, Clone, Debug, PartialEq, Eq)]
+pub struct SignatureBuiltinAdditionalData(pub HashMap<Relocatable, (Felt252, Felt252)>);
+
+impl Default for SignatureBuiltinAdditionalData {
+    fn default() -> Self {
+        Self(HashMap::default())
+    }
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(untagged)]
 pub enum BuiltinAdditionalData {
@@ -74,9 +86,53 @@ pub enum BuiltinAdditionalData {
     Hash(Vec<Relocatable>),
     Output(OutputBuiltinAdditionalData),
     // Signatures are composed of (r, s) tuples
-    #[serde(serialize_with = "serde_impl::serialize_signature_additional_data")]
-    Signature(HashMap<Relocatable, (Felt252, Felt252)>),
+    Signature(SignatureBuiltinAdditionalData),
     None,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq, Eq)]
+pub struct AdditionalData {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub output_builtin: Option<OutputBuiltinAdditionalData>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pedersen_builtin: Option<Vec<Relocatable>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ecdsa_builtin: Option<SignatureBuiltinAdditionalData>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub range_check_builtin: Option<()>,
+}
+
+impl AdditionalData {
+    pub fn is_empty(&self) -> bool {
+        self.output_builtin.is_none()
+            && self.pedersen_builtin.is_none()
+            && self.ecdsa_builtin.is_none()
+            && self.range_check_builtin.is_none()
+    }
+}
+
+impl From<HashMap<String, BuiltinAdditionalData>> for AdditionalData {
+    fn from(mut value: HashMap<String, BuiltinAdditionalData>) -> Self {
+        let output_builtin_data = match value.remove(OUTPUT_BUILTIN_NAME) {
+            Some(BuiltinAdditionalData::Output(output_data)) => Some(output_data),
+            _ => None,
+        };
+        let ecdsa_builtin_data = match value.remove(SIGNATURE_BUILTIN_NAME) {
+            Some(BuiltinAdditionalData::Signature(signature_data)) => Some(signature_data),
+            _ => None,
+        };
+        let pedersen_builtin_data = match value.remove(HASH_BUILTIN_NAME) {
+            Some(BuiltinAdditionalData::Hash(pedersen_data)) => Some(pedersen_data),
+            _ => None,
+        };
+
+        Self {
+            output_builtin: output_builtin_data,
+            ecdsa_builtin: ecdsa_builtin_data,
+            pedersen_builtin: pedersen_builtin_data,
+            range_check_builtin: None,
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
@@ -84,7 +140,7 @@ pub struct CairoPie {
     pub metadata: CairoPieMetadata,
     pub memory: CairoPieMemory,
     pub execution_resources: ExecutionResources,
-    pub additional_data: HashMap<String, BuiltinAdditionalData>,
+    pub additional_data: AdditionalData,
     pub version: CairoPieVersion,
 }
 
@@ -127,23 +183,23 @@ fn read_memory_file<R: Read>(
     addr_size: usize,
     felt_size: usize,
 ) -> Result<CairoPieMemory, DeserializeMemoryError> {
-    let memory_cell_size = addr_size + felt_size;
+    let pair_size = addr_size + felt_size;
     let mut memory = CairoPieMemory::new();
     let mut pos: usize = 0;
 
     loop {
-        let mut element = vec![0; memory_cell_size];
-        match reader.read(&mut element) {
-            Ok(n) => {
-                if n == 0 {
-                    break;
-                }
-                if n != memory_cell_size {
-                    return Err(DeserializeMemoryError::UnexpectedEof);
-                }
-            }
-            Err(e) => return Err(e.into()),
+        let mut element = Vec::with_capacity(pair_size);
+        let n = reader
+            .by_ref()
+            .take(pair_size as u64)
+            .read_to_end(&mut element)?;
+        if n == 0 {
+            break;
         }
+        if n != pair_size {
+            return Err(DeserializeMemoryError::UnexpectedEof);
+        }
+
         let (address_bytes, value_bytes) = element.split_at(addr_size);
         let address = maybe_relocatable_from_le_bytes(address_bytes);
         let value = maybe_relocatable_from_le_bytes(value_bytes);
@@ -159,7 +215,7 @@ fn read_memory_file<R: Read>(
                 return Err(DeserializeMemoryError::AddressIsNotRelocatable(pos));
             }
         }
-        pos += memory_cell_size;
+        pos += pair_size;
     }
 
     Ok(memory)
@@ -169,12 +225,11 @@ impl CairoPie {
     #[cfg(feature = "std")]
     pub fn from_zip_archive<R: Read + Seek>(
         mut zip: zip::ZipArchive<R>,
-    ) -> Result<CairoPie, CairoPieError> {
+    ) -> Result<Self, CairoPieError> {
         let metadata: CairoPieMetadata = parse_zip_file(zip.by_name("metadata.json")?)?;
         let execution_resources: ExecutionResources =
             parse_zip_file(zip.by_name("execution_resources.json")?)?;
-        let additional_data: HashMap<String, BuiltinAdditionalData> =
-            parse_zip_file(zip.by_name("additional_data.json")?)?;
+        let additional_data: AdditionalData = parse_zip_file(zip.by_name("additional_data.json")?)?;
         let version: CairoPieVersion = parse_zip_file(zip.by_name("version.json")?)?;
 
         let addr_size: usize = 8;
@@ -187,7 +242,7 @@ impl CairoPie {
         };
         let memory = read_memory_file(zip.by_name("memory.bin")?, addr_size, felt_bytes)?;
 
-        Ok(CairoPie {
+        Ok(Self {
             metadata,
             memory,
             execution_resources,
@@ -197,11 +252,19 @@ impl CairoPie {
     }
 
     #[cfg(feature = "std")]
-    pub fn from_file(path: &Path) -> Result<CairoPie, CairoPieError> {
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, CairoPieError> {
+        let reader = std::io::Cursor::new(bytes);
+        let zip_archive = zip::ZipArchive::new(reader)?;
+
+        Self::from_zip_archive(zip_archive)
+    }
+
+    #[cfg(feature = "std")]
+    pub fn from_file(path: &Path) -> Result<Self, CairoPieError> {
         let file = std::fs::File::open(path)?;
         let zip = zip::ZipArchive::new(file)?;
 
-        CairoPie::from_zip_archive(zip)
+        Self::from_zip_archive(zip)
     }
 }
 
@@ -266,14 +329,16 @@ mod serde_impl {
         Felt252,
     };
     use num_bigint::BigUint;
-    use serde::de::SeqAccess;
-    use serde::{de, ser::SerializeSeq, Deserializer, Serialize, Serializer};
+    use serde::de::{MapAccess, SeqAccess};
+    use serde::{de, ser::SerializeSeq, Deserialize, Deserializer, Serialize, Serializer};
     use serde_json::Number;
     use std::fmt;
+    use std::fmt::Formatter;
 
     use crate::serde::deserialize_utils::felt_from_number;
 
     use crate::utils::CAIRO_PRIME;
+    use crate::vm::runners::cairo_pie::SignatureBuiltinAdditionalData;
 
     pub const ADDR_BYTE_LEN: usize = 8;
     pub const FIELD_BYTE_LEN: usize = 32;
@@ -455,27 +520,6 @@ mod serde_impl {
         d.deserialize_seq(MaybeRelocatableNumberVisitor)
     }
 
-    pub fn serialize_signature_additional_data<S>(
-        values: &HashMap<Relocatable, (Felt252, Felt252)>,
-        serializer: S,
-    ) -> Result<S::Ok, S::Error>
-        where
-            S: Serializer,
-    {
-        let mut seq_serializer = serializer.serialize_seq(Some(values.len()))?;
-
-        for (key, (x, y)) in values {
-            seq_serializer.serialize_element(&[
-                [
-                    Felt252Wrapper(&Felt252::from(key.segment_index)),
-                    Felt252Wrapper(&Felt252::from(key.offset)),
-                ],
-                [Felt252Wrapper(x), Felt252Wrapper(y)],
-            ])?;
-        }
-        seq_serializer.end()
-    }
-
     pub fn serialize_hash_additional_data<S>(
         values: &[Relocatable],
         serializer: S,
@@ -490,6 +534,61 @@ mod serde_impl {
         }
 
         seq_serializer.end()
+    }
+
+    struct SignatureBuiltinAdditionalDataVisitor;
+
+    impl<'de> de::Visitor<'de> for SignatureBuiltinAdditionalDataVisitor {
+        type Value = SignatureBuiltinAdditionalData;
+
+        fn expecting(&self, formatter: &mut Formatter) -> fmt::Result {
+            write!(
+                formatter,
+                "a Vec<(Relocatable, (Felt252, Felt252))> or a HashMap<Relocatable, (Felt252, Felt252)>"
+            )
+        }
+
+        fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+            where
+                A: SeqAccess<'de>,
+        {
+            let mut map = HashMap::with_capacity(seq.size_hint().unwrap_or(0));
+
+            // While there are entries remaining in the input, add them
+            // into our map.
+            while let Some((key, value)) = seq.next_element()? {
+                map.insert(key, value);
+            }
+
+            Ok(SignatureBuiltinAdditionalData(map))
+        }
+
+        fn visit_map<A>(self, mut access: A) -> Result<Self::Value, A::Error>
+            where
+                A: MapAccess<'de>,
+        {
+            let mut map = HashMap::with_capacity(access.size_hint().unwrap_or(0));
+
+            // While there are entries remaining in the input, add them
+            // into our map.
+            while let Some((key, value)) = access.next_entry()? {
+                map.insert(key, value);
+            }
+
+            Ok(SignatureBuiltinAdditionalData(map))
+        }
+    }
+
+    // This is the trait that informs Serde how to deserialize MyMap.
+    impl<'de> Deserialize<'de> for SignatureBuiltinAdditionalData {
+        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+            where
+                D: Deserializer<'de>,
+        {
+            // Instantiate our Visitor and ask the Deserializer to drive
+            // it over the input data, resulting in an instance of MyMap.
+            deserializer.deserialize_any(SignatureBuiltinAdditionalDataVisitor {})
+        }
     }
 }
 
@@ -658,16 +757,59 @@ mod test {
 
         assert_eq!(
             cairo_pie.additional_data,
-            HashMap::from([(
-                "output_builtin".to_string(),
-                BuiltinAdditionalData::Output(OutputBuiltinAdditionalData {
+            AdditionalData {
+                output_builtin: Some(OutputBuiltinAdditionalData {
                     base: 0,
                     pages: Default::default(),
                     attributes: Default::default(),
-                })
-            )])
+                }),
+                pedersen_builtin: None,
+                ecdsa_builtin: None,
+                range_check_builtin: None,
+            }
         );
 
         assert_eq!(cairo_pie.version.cairo_pie, CAIRO_PIE_VERSION);
+    }
+
+    #[test]
+    fn test_deserialize_additional_data() {
+        let data = include_bytes!(
+            "../../../../cairo_programs/manually_compiled/pie_additional_data_test.json"
+        );
+        let additional_data: AdditionalData = serde_json::from_slice(data).unwrap();
+        let output_data = additional_data.output_builtin.unwrap();
+        assert_eq!(
+            output_data.pages,
+            HashMap::from([(
+                1,
+                PublicMemoryPage {
+                    start: 18,
+                    size: 46,
+                }
+            )])
+        );
+        assert_eq!(
+            output_data.attributes,
+            HashMap::from([("gps_fact_topology".to_string(), vec![2, 1, 0, 2])])
+        );
+        let pedersen_data = additional_data.pedersen_builtin.unwrap();
+        assert_eq!(
+            pedersen_data,
+            vec![
+                Relocatable::from((3, 2)),
+                Relocatable::from((3, 5)),
+                Relocatable::from((3, 8)),
+                Relocatable::from((3, 11)),
+                Relocatable::from((3, 14)),
+                Relocatable::from((3, 17)),
+            ]
+        );
+        // TODO: add a test case with signature data
+        let expected_signature_additional_data = Some(SignatureBuiltinAdditionalData::default());
+        assert_eq!(
+            additional_data.ecdsa_builtin,
+            expected_signature_additional_data
+        );
     }
 }

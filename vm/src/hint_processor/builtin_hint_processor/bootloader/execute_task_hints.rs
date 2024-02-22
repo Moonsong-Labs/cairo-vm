@@ -1,14 +1,13 @@
 use std::any::Any;
 use std::collections::HashMap;
 
-use num_traits::ToPrimitive;
 use starknet_crypto::FieldElement;
 
 use crate::Felt252;
 
 use crate::any_box;
 use crate::hint_processor::builtin_hint_processor::bootloader::fact_topologies::{
-    get_program_task_fact_topology, FactTopology,
+    get_task_fact_topology, FactTopology,
 };
 use crate::hint_processor::builtin_hint_processor::bootloader::load_cairo_pie::load_cairo_pie;
 use crate::hint_processor::builtin_hint_processor::bootloader::program_hash::compute_program_hash_chain;
@@ -19,11 +18,12 @@ use crate::hint_processor::builtin_hint_processor::hint_utils::{
     get_ptr_from_var_name, get_relocatable_from_var_name, insert_value_from_var_name,
 };
 use crate::hint_processor::hint_processor_definition::HintReference;
-use crate::serde::deserialize_program::{ApTracking, BuiltinName};
-use crate::types::errors::math_errors::MathError;
+use crate::serde::deserialize_program::{ApTracking, BuiltinName, Identifier};
 use crate::types::exec_scope::ExecutionScopes;
+use crate::types::program::Program;
 use crate::types::relocatable::Relocatable;
 use crate::vm::errors::hint_errors::HintError;
+use crate::vm::errors::memory_errors::MemoryError;
 use crate::vm::runners::cairo_pie::{CairoPie, OutputBuiltinAdditionalData, StrippedProgram};
 use crate::vm::vm_core::VirtualMachine;
 use crate::vm::vm_memory::memory::Memory;
@@ -119,7 +119,7 @@ pub fn append_fact_topologies(
     ap_tracking: &ApTracking,
 ) -> Result<(), HintError> {
     let task: Task = exec_scopes.get(vars::TASK)?;
-    let output_runner_data: OutputBuiltinAdditionalData =
+    let output_runner_data: Option<OutputBuiltinAdditionalData> =
         exec_scopes.get(vars::OUTPUT_RUNNER_DATA)?;
     let fact_topologies: &mut Vec<FactTopology> = exec_scopes.get_mut_ref(vars::FACT_TOPOLOGIES)?;
 
@@ -129,22 +129,13 @@ pub fn append_fact_topologies(
         get_relocatable_from_var_name("return_builtin_ptrs", vm, ids_data, ap_tracking)?;
 
     // The output field is the first one in the BuiltinData struct
-    let output_start = vm
-        .get_integer(pre_execution_builtin_ptrs_addr)?
-        .into_owned();
-    let output_end = vm.get_integer(return_builtin_ptrs_addr)?.into_owned();
-    let output_size = {
-        let output_size_felt = output_end - output_start;
-        output_size_felt
-            .to_usize()
-            .ok_or(MathError::Felt252ToUsizeConversion(Box::new(
-                output_size_felt,
-            )))
-    }?;
+    let output_start = vm.get_relocatable(pre_execution_builtin_ptrs_addr)?;
+    let output_end = vm.get_relocatable(return_builtin_ptrs_addr)?;
+    let output_size = (output_end - output_start)?;
 
     let output_builtin = vm.get_output_builtin()?;
     let fact_topology =
-        get_program_task_fact_topology(output_size, &task, output_builtin, output_runner_data)
+        get_task_fact_topology(output_size, &task, output_builtin, output_runner_data)
             .map_err(Into::<HintError>::into)?;
     fact_topologies.push(fact_topology);
 
@@ -214,19 +205,16 @@ fn check_cairo_pie_builtin_usage(
     return_builtins_addr: &Relocatable,
     pre_execution_builtins_addr: &Relocatable,
 ) -> Result<(), HintError> {
-    let return_builtin_value = memory
-        .get_integer(return_builtins_addr + builtin_index)?
-        .into_owned();
-    let pre_execution_builtin_value = memory
-        .get_integer(pre_execution_builtins_addr + builtin_index)?
-        .into_owned();
-    let expected_builtin_size = return_builtin_value - pre_execution_builtin_value;
+    let return_builtin_value = memory.get_relocatable(return_builtins_addr + builtin_index)?;
+    let pre_execution_builtin_value =
+        memory.get_relocatable(pre_execution_builtins_addr + builtin_index)?;
+    let expected_builtin_size = (return_builtin_value - pre_execution_builtin_value)?;
 
     let builtin_name = builtin
         .name()
         .strip_suffix("_builtin")
         .unwrap_or(builtin.name());
-    let builtin_size = Felt252::from(cairo_pie.metadata.builtin_segments[builtin_name].size);
+    let builtin_size = cairo_pie.metadata.builtin_segments[builtin_name].size;
 
     if builtin_size != expected_builtin_size {
         return Err(HintError::AssertionFailed(
@@ -254,9 +242,7 @@ fn write_return_builtins(
     let mut used_builtin_offset: usize = 0;
     for (index, builtin) in ALL_BUILTINS.iter().enumerate() {
         if used_builtins.contains(builtin) {
-            let builtin_value = memory
-                .get_integer(used_builtins_addr + used_builtin_offset)?
-                .into_owned();
+            let builtin_value = memory.get_relocatable(used_builtins_addr + used_builtin_offset)?;
             memory.insert_value(return_builtins_addr + index, builtin_value)?;
             used_builtin_offset += 1;
 
@@ -273,8 +259,12 @@ fn write_return_builtins(
         }
         // The builtin is unused, hence its value is the same as before calling the program.
         else {
+            let pre_execution_builtin_addr = pre_execution_builtins_addr + index;
             let pre_execution_value = memory
-                .get_integer(pre_execution_builtins_addr + index)?
+                .get(&pre_execution_builtin_addr)
+                .ok_or_else(|| {
+                    MemoryError::UnknownMemoryCell(Box::new(pre_execution_builtin_addr))
+                })?
                 .into_owned();
             memory.insert_value(return_builtins_addr + index, pre_execution_value)?;
         }
@@ -340,6 +330,33 @@ pub fn write_return_builtins_hint(
     Ok(())
 }
 
+fn get_bootloader_program(exec_scopes: &ExecutionScopes) -> Result<&Program, HintError> {
+    if let Some(boxed_program) = exec_scopes.data[0].get(vars::BOOTLOADER_PROGRAM) {
+        if let Some(program) = boxed_program.downcast_ref::<Program>() {
+            return Ok(program);
+        }
+    }
+
+    Err(HintError::VariableNotInScopeError(
+        vars::BOOTLOADER_PROGRAM.to_string().into_boxed_str(),
+    ))
+}
+
+fn get_identifier(
+    identifiers: &HashMap<String, Identifier>,
+    name: &str,
+) -> Result<usize, HintError> {
+    if let Some(identifier) = identifiers.get(name) {
+        if let Some(pc) = identifier.pc {
+            return Ok(pc);
+        }
+    }
+
+    Err(HintError::VariableNotInScopeError(
+        name.to_string().into_boxed_str(),
+    ))
+}
+
 /*
 Implements hint:
 %{
@@ -387,11 +404,11 @@ pub fn call_task(
     let task: Task = exec_scopes.get(vars::TASK)?;
 
     // n_builtins = len(task.get_program().builtins)
-    let num_builtins = get_program_from_task(&task)?.builtins.len();
+    let n_builtins = get_program_from_task(&task)?.builtins.len();
+    exec_scopes.insert_value(vars::N_BUILTINS, n_builtins);
 
     let mut new_task_locals = HashMap::new();
 
-    // TODO: remove clone here when RunProgramTask has proper variant data (not String)
     match &task {
         // if isinstance(task, RunProgramTask):
         Task::Program(_program) => {
@@ -410,6 +427,17 @@ pub fn call_task(
             let program_address: Relocatable = exec_scopes.get("program_address")?;
 
             // ret_pc = ids.ret_pc_label.instruction_offset_ - ids.call_task.instruction_offset_ + pc
+            let bootloader_program = get_bootloader_program(exec_scopes)?;
+            let identifiers = &bootloader_program.shared_program_data.identifiers;
+            let ret_pc_label = get_identifier(identifiers, "starkware.cairo.bootloaders.simple_bootloader.execute_task.execute_task.ret_pc_label")?;
+            let call_task = get_identifier(
+                identifiers,
+                "starkware.cairo.bootloaders.simple_bootloader.execute_task.execute_task.call_task",
+            )?;
+
+            let ret_pc_offset = ret_pc_label - call_task;
+            let ret_pc = (vm.run_context.pc + ret_pc_offset)?;
+
             // load_cairo_pie(
             //     task=task.cairo_pie, memory=memory, segments=segments,
             //     program_address=program_address, execution_segment_address= ap - n_builtins,
@@ -418,9 +446,9 @@ pub fn call_task(
                 cairo_pie,
                 vm,
                 program_address,
-                (vm.get_ap() - num_builtins)?,
+                (vm.get_ap() - n_builtins)?,
                 vm.get_fp(),
-                vm.get_pc(),
+                ret_pc,
             )
             .map_err(Into::<HintError>::into)?;
         }
@@ -432,16 +460,12 @@ pub fn call_task(
     //     output_ptr=ids.pre_execution_builtin_ptrs.output)
     let pre_execution_builtin_ptrs_addr =
         get_relocatable_from_var_name(vars::PRE_EXECUTION_BUILTIN_PTRS, vm, ids_data, ap_tracking)?;
-    let output = vm
-        .get_integer(pre_execution_builtin_ptrs_addr)?
-        .into_owned();
-    let output_ptr = output
-        .to_usize()
-        .ok_or(MathError::Felt252ToUsizeConversion(Box::new(output)))?;
+    // The output field is the first one in the BuiltinData struct
+    let output_ptr = vm.get_relocatable(&pre_execution_builtin_ptrs_addr + 0)?;
     let output_runner_data =
         util::prepare_output_runner(&task, vm.get_output_builtin()?, output_ptr)?;
 
-    exec_scopes.insert_box(vars::OUTPUT_RUNNER_DATA, any_box!(output_runner_data));
+    exec_scopes.insert_value(vars::OUTPUT_RUNNER_DATA, output_runner_data);
 
     exec_scopes.enter_scope(new_task_locals);
 
@@ -465,7 +489,7 @@ mod util {
     pub(crate) fn prepare_output_runner(
         task: &Task,
         output_builtin: &mut OutputBuiltinRunner,
-        output_ptr: usize,
+        output_ptr: Relocatable,
     ) -> Result<Option<OutputBuiltinAdditionalData>, HintError> {
         return match task {
             Task::Program(_) => {
@@ -477,7 +501,7 @@ mod util {
                             .into_boxed_str(),
                     )),
                 }?;
-                output_builtin.base = output_ptr;
+                output_builtin.new_state(output_ptr.segment_index as usize, true);
                 Ok(Some(output_state))
             }
             Task::Pie(_) => Ok(None),
@@ -492,18 +516,16 @@ mod tests {
     use assert_matches::assert_matches;
     use rstest::{fixture, rstest};
 
-    use crate::Felt252;
-
     use crate::any_box;
     use crate::hint_processor::builtin_hint_processor::builtin_hint_processor_definition::BuiltinHintProcessor;
     use crate::hint_processor::builtin_hint_processor::builtin_hint_processor_definition::HintProcessorData;
     use crate::hint_processor::builtin_hint_processor::hint_code;
     use crate::hint_processor::builtin_hint_processor::hint_utils::get_ptr_from_var_name;
     use crate::hint_processor::hint_processor_definition::HintProcessorLogic;
-    use crate::types::relocatable::Relocatable;
+    use crate::types::relocatable::{MaybeRelocatable, Relocatable};
     use crate::utils::test_utils::*;
     use crate::vm::runners::builtin_runner::{BuiltinRunner, OutputBuiltinRunner};
-    use crate::vm::runners::cairo_pie::{BuiltinAdditionalData, PublicMemoryPage};
+    use crate::vm::runners::cairo_pie::{BuiltinAdditionalData, CairoPie, PublicMemoryPage};
 
     use super::*;
 
@@ -615,7 +637,7 @@ mod tests {
 
         // Allocate space for pre-execution (8 felts), which mimics the `BuiltinData` struct in the
         // Bootloader's Cairo code. Our code only uses the first felt (`output` field in the struct)
-        vm.segments = segments![((1, 0), 0)];
+        vm.segments = segments![((1, 0), (2, 0))];
         vm.run_context.fp = 8;
         add_segments!(vm, 1);
 
@@ -642,6 +664,42 @@ mod tests {
         );
     }
 
+    /// Creates a fake Program struct to act as a placeholder for the `BOOTLOADER_PROGRAM` variable.
+    /// These other options have been considered:
+    /// * a `HasIdentifiers` trait cannot be used as exec_scopes requires to cast to `Box<dyn Any>`,
+    ///   making casting back to the trait impossible.
+    /// * using an enum requires defining test-only variants.
+    fn mock_program_with_identifiers(symbols: HashMap<String, usize>) -> Program {
+        let identifiers = symbols
+            .into_iter()
+            .map(|(name, pc)| {
+                (
+                    name,
+                    Identifier {
+                        pc: Some(pc),
+                        type_: None,
+                        value: None,
+                        full_name: None,
+                        members: None,
+                        cairo_type: None,
+                    },
+                )
+            })
+            .collect();
+
+        let shared_program_data = SharedProgramData {
+            identifiers,
+            ..Default::default()
+        };
+        let program = Program {
+            shared_program_data: Arc::new(shared_program_data),
+            constants: Default::default(),
+            builtins: vec![],
+        };
+
+        program
+    }
+
     #[rstest]
     fn test_call_cairo_pie_task(fibonacci_pie: CairoPie) {
         let mut vm = vm!();
@@ -651,7 +709,7 @@ mod tests {
         // the Bootloader Cairo code. Our code only uses the first felt (`output` field in the
         // struct). Finally, we put the mocked output of `select_input_builtins` in the next
         // memory address and increase the AP register accordingly.
-        vm.segments = segments![((1, 0), (2, 0)), ((1, 1), 42), ((1, 9), (4, 0))];
+        vm.segments = segments![((1, 0), (2, 0)), ((1, 1), (4, 0)), ((1, 9), (4, 42))];
         vm.run_context.ap = 10;
         vm.run_context.fp = 9;
         add_segments!(vm, 3);
@@ -672,7 +730,15 @@ mod tests {
 
         let task = Task::Pie(fibonacci_pie);
         exec_scopes.insert_value(vars::TASK, task);
+        let bootloader_identifiers = HashMap::from(
+            [
+                ("starkware.cairo.bootloaders.simple_bootloader.execute_task.execute_task.ret_pc_label".to_string(), 10usize),
+                ("starkware.cairo.bootloaders.simple_bootloader.execute_task.execute_task.call_task".to_string(), 8usize)
+            ]
+        );
+        let bootloader_program = mock_program_with_identifiers(bootloader_identifiers);
         exec_scopes.insert_value(vars::PROGRAM_DATA_BASE, program_header_ptr.clone());
+        exec_scopes.insert_value(vars::BOOTLOADER_PROGRAM, bootloader_program);
 
         // Load the program in memory
         load_program_hint(&mut vm, &mut exec_scopes, &ids_data, &ap_tracking)
@@ -691,8 +757,9 @@ mod tests {
 
         // Allocate space for the pre-execution and return builtin structs (2 x 8 felts).
         // The pre-execution struct starts at (1, 0) and the return struct at (1, 8).
-        // We only set the output values to 0 and 10, respectively, to get an output size of 10.
-        vm.segments = segments![((1, 0), 0), ((1, 8), 10),];
+        // We only set the output values to (2, 0) and (2, 10), respectively, to get an output size
+        // of 10.
+        vm.segments = segments![((1, 0), (2, 0)), ((1, 8), (2, 10)),];
         vm.run_context.fp = 16;
         add_segments!(vm, 1);
 
@@ -725,7 +792,7 @@ mod tests {
             pages: HashMap::new(),
             attributes: HashMap::new(),
         };
-        exec_scopes.insert_value(vars::OUTPUT_RUNNER_DATA, output_runner_data.clone());
+        exec_scopes.insert_value(vars::OUTPUT_RUNNER_DATA, Some(output_runner_data.clone()));
         exec_scopes.insert_value(vars::TASK, task);
         exec_scopes.insert_value(vars::FACT_TOPOLOGIES, Vec::<FactTopology>::new());
 
@@ -761,16 +828,16 @@ mod tests {
         // are used by the field arithmetic program. Note that the used builtins list
         // does not contain empty elements (i.e. offsets are 8 and 9 instead of 10 and 12).
         vm.segments = segments![
-            ((1, 0), 1),
-            ((1, 1), 2),
-            ((1, 2), 3),
-            ((1, 3), 4),
-            ((1, 4), 5),
-            ((1, 5), 6),
-            ((1, 6), 7),
-            ((1, 7), 8),
-            ((1, 8), 30),
-            ((1, 9), 50),
+            ((1, 0), (2, 1)),
+            ((1, 1), (2, 2)),
+            ((1, 2), (2, 3)),
+            ((1, 3), (2, 4)),
+            ((1, 4), (2, 5)),
+            ((1, 5), (2, 6)),
+            ((1, 6), (2, 7)),
+            ((1, 7), (2, 8)),
+            ((1, 8), (2, 30)),
+            ((1, 9), (2, 50)),
             ((1, 24), (1, 8)),
         ];
         vm.run_context.fp = 25;
@@ -796,12 +863,21 @@ mod tests {
         let return_builtins = vm
             .segments
             .memory
-            .get_integer_range(Relocatable::from((1, 16)), 8)
+            .get_continuous_range(Relocatable::from((1, 16)), 8)
             .expect("Return builtin was not properly written to memory.");
 
-        let expected_builtins = vec![1, 2, 30, 4, 50, 6, 7, 8];
+        let expected_builtins = vec![
+            Relocatable::from((2, 1)),
+            Relocatable::from((2, 2)),
+            Relocatable::from((2, 30)),
+            Relocatable::from((2, 4)),
+            Relocatable::from((2, 50)),
+            Relocatable::from((2, 6)),
+            Relocatable::from((2, 7)),
+            Relocatable::from((2, 8)),
+        ];
         for (expected, actual) in std::iter::zip(expected_builtins, return_builtins) {
-            assert_eq!(Felt252::from(expected), actual.into_owned());
+            assert_eq!(MaybeRelocatable::RelocatableValue(expected), actual);
         }
 
         // Check that the exec scope changed

@@ -1,6 +1,9 @@
 /// Deserialized bootloader input.
 pub(crate) const BOOTLOADER_INPUT: &str = "bootloader_input";
 
+/// The bootloader program, as a Program object.
+pub(crate) const BOOTLOADER_PROGRAM: &str = "bootloader_program";
+
 /// Saved state of the output builtin.
 pub(crate) const OUTPUT_BUILTIN_STATE: &str = "output_builtin_state";
 

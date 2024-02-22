@@ -1466,7 +1466,9 @@ pub const BOOTLOADER_IMPORT_PACKED_OUTPUT_SCHEMAS: &str =
     PlainPackedOutput,
 )";
 
-pub const BOOTLOADER_IS_PLAIN_PACKED_OUTPUT: &str = "isinstance(packed_output, PlainPackedOutput)";
+// Appears as nondet %{ isinstance(packed_output, PlainPackedOutput) %} in the code.
+pub const BOOTLOADER_IS_PLAIN_PACKED_OUTPUT: &str =
+    "memory[ap] = to_felt_or_relocatable(isinstance(packed_output, PlainPackedOutput))";
 
 pub const BOOTLOADER_SAVE_OUTPUT_POINTER: &str = "output_start = ids.output_ptr";
 
@@ -1525,7 +1527,9 @@ fact_topologies = []";
 
 pub const SIMPLE_BOOTLOADER_SET_TASKS_VARIABLE: &str = "tasks = simple_bootloader_input.tasks";
 
-pub const SIMPLE_BOOTLOADER_DIVIDE_NUM_BY_2: &str = "ids.num // 2";
+// Appears as nondet %{ ids.num // 2 %} in the code.
+pub const SIMPLE_BOOTLOADER_DIVIDE_NUM_BY_2: &str =
+    "memory[ap] = to_felt_or_relocatable(ids.num // 2)";
 
 pub const SIMPLE_BOOTLOADER_SET_CURRENT_TASK: &str =
     "from starkware.cairo.bootloaders.simple_bootloader.objects import Task
@@ -1534,7 +1538,8 @@ pub const SIMPLE_BOOTLOADER_SET_CURRENT_TASK: &str =
 task_id = len(simple_bootloader_input.tasks) - ids.n_tasks
 task = simple_bootloader_input.tasks[task_id].load_task()";
 
-pub const SIMPLE_BOOTLOADER_ZERO: &str = "0";
+// Appears as nondet %{ 0 %} in the code.
+pub const SIMPLE_BOOTLOADER_ZERO: &str = "memory[ap] = to_felt_or_relocatable(0)";
 
 pub const EXECUTE_TASK_ALLOCATE_PROGRAM_DATA_SEGMENT: &str =
     "ids.program_data_ptr = program_data_base = segments.add()";
@@ -1551,7 +1556,7 @@ segments.finalize(program_data_base.segment_index, program_data_size)";
 pub const EXECUTE_TASK_VALIDATE_HASH: &str = "# Validate hash.
 from starkware.cairo.bootloaders.hash_program import compute_program_hash_chain
 
-assert memory[ids.output_ptr + 1] == compute_program_hash_chain(task.get_program()), \
+assert memory[ids.output_ptr + 1] == compute_program_hash_chain(task.get_program()), \\
   'Computed hash does not match input.'";
 
 pub const EXECUTE_TASK_ASSERT_PROGRAM_ADDRESS: &str = "# Sanity check.
@@ -1619,6 +1624,9 @@ fact_topologies.append(get_task_fact_topology(
     output_runner_data=output_runner_data,
 ))";
 
+pub const SELECT_BUILTINS_ENTER_SCOPE: &str =
+    "vm_enter_scope({'n_selected_builtins': ids.n_selected_builtins})";
+
 pub const INNER_SELECT_BUILTINS_SELECT_BUILTIN: &str =
     "# A builtin should be selected iff its encoding appears in the selected encodings list
 # and the list wasn't exhausted.
@@ -1627,6 +1635,3 @@ ids.select_builtin = int(
   n_selected_builtins > 0 and memory[ids.selected_encodings] == memory[ids.all_encodings])
 if ids.select_builtin:
   n_selected_builtins = n_selected_builtins - 1";
-
-pub const SELECT_BUILTINS_ENTER_SCOPE: &str =
-    "vm_enter_scope({'n_selected_builtins': ids.n_selected_builtins})";

@@ -75,6 +75,9 @@ pub enum FactTopologyError {
     #[error("Could not add page to output: {0}")]
     FailedToAddOutputPage(#[from] RunnerError),
 
+    #[error("Could not load output builtin additional data from Cairo PIE")]
+    CairoPieHasNoOutputBuiltinData,
+
     #[error("Unexpected error: {0}")]
     Internal(Box<str>),
 }
@@ -333,9 +336,8 @@ fn get_fact_topology_from_additional_data(
 }
 
 // TODO: implement for CairoPieTask
-pub fn get_program_task_fact_topology(
+fn get_program_task_fact_topology(
     output_size: usize,
-    _task: &Task,
     output_builtin: &mut OutputBuiltinRunner,
     output_runner_data: OutputBuiltinAdditionalData,
 ) -> Result<FactTopology, FactTopologyError> {
@@ -355,6 +357,39 @@ pub fn get_program_task_fact_topology(
     output_builtin.set_state(output_runner_data);
 
     Ok(fact_topology)
+}
+
+pub fn get_task_fact_topology(
+    output_size: usize,
+    task: &Task,
+    output_builtin: &mut OutputBuiltinRunner,
+    output_runner_data: Option<OutputBuiltinAdditionalData>,
+) -> Result<FactTopology, FactTopologyError> {
+    match task {
+        Task::Program(_program) => {
+            let output_runner_data = output_runner_data.ok_or(FactTopologyError::Internal(
+                "Output runner data not set for program task"
+                    .to_string()
+                    .into_boxed_str(),
+            ))?;
+            get_program_task_fact_topology(output_size, output_builtin, output_runner_data)
+        }
+        Task::Pie(cairo_pie) => {
+            if let Some(_) = output_runner_data {
+                return Err(FactTopologyError::Internal(
+                    "Output runner data set for Cairo PIE task"
+                        .to_string()
+                        .into_boxed_str(),
+                ));
+            }
+            let additional_data = cairo_pie
+                .additional_data
+                .output_builtin
+                .as_ref()
+                .ok_or(FactTopologyError::CairoPieHasNoOutputBuiltinData)?;
+            get_fact_topology_from_additional_data(output_size, &additional_data)
+        }
+    }
 }
 
 /// Writes fact topologies to a file, as JSON.

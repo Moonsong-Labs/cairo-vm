@@ -74,8 +74,8 @@ pub fn set_tasks_variable(exec_scopes: &mut ExecutionScopes) -> Result<(), HintE
     Ok(())
 }
 
-/// Implements
-/// %{ ids.num // 2 %}
+/// Implements %{ ids.num // 2 %}
+/// (compiled to %{ memory[ap] = to_felt_or_relocatable(ids.num // 2) %}).
 pub fn divide_num_by_2(
     vm: &mut VirtualMachine,
     ids_data: &HashMap<String, HintReference>,
@@ -91,7 +91,7 @@ pub fn divide_num_by_2(
     Ok(())
 }
 
-/// Implements %{ 0 %}.
+/// Implements %{ 0 %} (compiled to %{ memory[ap] = to_felt_or_relocatable(0) %}).
 ///
 /// Stores 0 in the AP and returns.
 /// Used as `tempvar use_poseidon = nondet %{ 0 %}`.

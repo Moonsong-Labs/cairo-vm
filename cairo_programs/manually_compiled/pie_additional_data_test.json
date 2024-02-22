@@ -1,0 +1,50 @@
+{
+  "output_builtin": {
+    "pages": {
+      "1": [
+        18,
+        46
+      ]
+    },
+    "attributes": {
+      "gps_fact_topology": [
+        2,
+        1,
+        0,
+        2
+      ]
+    }
+  },
+  "pedersen_builtin": [
+    [
+      3,
+      2
+    ],
+    [
+      3,
+      5
+    ],
+    [
+      3,
+      8
+    ],
+    [
+      3,
+      11
+    ],
+    [
+      3,
+      14
+    ],
+    [
+      3,
+      17
+    ]
+  ],
+  "range_check_builtin": null,
+  "ecdsa_builtin": [],
+  "bitwise_builtin": null,
+  "ec_op_builtin": null,
+  "keccak_builtin": null,
+  "poseidon_builtin": null
+}

@@ -922,15 +922,15 @@ impl HintProcessorLogic for BuiltinHintProcessor {
             hint_code::EXECUTE_TASK_APPEND_FACT_TOPOLOGIES => {
                 append_fact_topologies(vm, exec_scopes, &hint_data.ids_data, &hint_data.ap_tracking)
             }
-            hint_code::INNER_SELECT_BUILTINS_SELECT_BUILTIN => {
-                select_builtin(vm, exec_scopes, &hint_data.ids_data, &hint_data.ap_tracking)
-            }
             hint_code::SELECT_BUILTINS_ENTER_SCOPE => select_builtins_enter_scope(
                 vm,
                 exec_scopes,
                 &hint_data.ids_data,
                 &hint_data.ap_tracking,
             ),
+            hint_code::INNER_SELECT_BUILTINS_SELECT_BUILTIN => {
+                select_builtin(vm, exec_scopes, &hint_data.ids_data, &hint_data.ap_tracking)
+            }
             #[cfg(feature = "skip_next_instruction_hint")]
             hint_code::SKIP_NEXT_INSTRUCTION => skip_next_instruction(vm),
             #[cfg(feature = "print")]

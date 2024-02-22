@@ -35,13 +35,7 @@ fn builtin_to_felt(builtin: &BuiltinName) -> Result<Felt252, ProgramLoaderError>
         .strip_suffix("_builtin")
         .unwrap_or(builtin.name());
 
-    // let buf = {
-    //     let mut padding: Vec<u8> = vec![0; 32 - builtin_name.len()];
-    //     padding.extend_from_slice(builtin_name.as_bytes());
-    //     padding
-    // };
-    let buf = builtin_name.as_bytes();
-    Ok(Felt252::from_bytes_be_slice(&buf))
+    Ok(Felt252::from_bytes_be_slice(builtin_name.as_bytes()))
 }
 
 pub struct LoadedProgram {
@@ -200,7 +194,7 @@ mod tests {
                         "Could not decode builtin from memory (expected {})",
                         builtin
                     )
-                    .as_ref(),
+                        .as_ref(),
                 );
             // Compare the last N characters, builtin_from_felt is padded left with zeroes
             assert_eq!(&builtin_from_felt[32 - builtin.len()..32], builtin);

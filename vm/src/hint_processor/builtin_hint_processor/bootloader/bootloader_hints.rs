@@ -87,7 +87,10 @@ pub fn prepare_simple_bootloader_output_segment(
 /// Implements %{ simple_bootloader_input = bootloader_input %}
 pub fn prepare_simple_bootloader_input(exec_scopes: &mut ExecutionScopes) -> Result<(), HintError> {
     let bootloader_input: BootloaderInput = exec_scopes.get(vars::BOOTLOADER_INPUT)?;
-    exec_scopes.insert_value(vars::SIMPLE_BOOTLOADER_INPUT, bootloader_input);
+    exec_scopes.insert_value(
+        vars::SIMPLE_BOOTLOADER_INPUT,
+        bootloader_input.simple_bootloader_input,
+    );
 
     Ok(())
 }
@@ -226,6 +229,7 @@ pub fn import_packed_output_schemas() -> Result<(), HintError> {
 }
 
 /// Implements %{ isinstance(packed_output, PlainPackedOutput) %}
+/// (compiled to %{ memory[ap] = to_felt_or_relocatable(isinstance(packed_output, PlainPackedOutput)) %}).
 ///
 /// Stores the result in the `ap` register to be accessed by the program.
 pub fn is_plain_packed_output(
@@ -564,18 +568,21 @@ mod tests {
 
         prepare_simple_bootloader_input(&mut exec_scopes).expect("Hint failed unexpectedly");
 
-        let simple_bootloader_input: BootloaderInput = exec_scopes
+        let simple_bootloader_input: SimpleBootloaderInput = exec_scopes
             .get(vars::SIMPLE_BOOTLOADER_INPUT)
             .expect("Simple bootloader input not in scope");
-        assert_eq!(simple_bootloader_input, bootloader_input);
+        assert_eq!(
+            simple_bootloader_input,
+            bootloader_input.simple_bootloader_input
+        );
     }
 
     #[test]
     fn test_restore_bootloader_output() {
         let mut vm: VirtualMachine = vm!();
         // The VM must have an existing output segment
-        vm.builtin_runners =
-            vec![OutputBuiltinRunner::from_segment(&vm.add_memory_segment(), true).into()];
+        let output_segment = vm.add_memory_segment();
+        vm.builtin_runners = vec![OutputBuiltinRunner::from_segment(&output_segment, true).into()];
 
         let mut exec_scopes = ExecutionScopes::new();
         let new_segment = vm.add_memory_segment();

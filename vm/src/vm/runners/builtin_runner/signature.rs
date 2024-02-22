@@ -4,7 +4,7 @@ use crate::stdlib::{cell::RefCell, collections::HashMap, prelude::*, rc::Rc};
 
 use crate::types::errors::math_errors::MathError;
 use crate::types::instance_definitions::ecdsa_instance_def::CELLS_PER_SIGNATURE;
-use crate::vm::runners::cairo_pie::BuiltinAdditionalData;
+use crate::vm::runners::cairo_pie::{BuiltinAdditionalData, SignatureBuiltinAdditionalData};
 use crate::Felt252;
 use crate::{
     types::{
@@ -239,7 +239,7 @@ impl SignatureBuiltinRunner {
                 )
             })
             .collect();
-        BuiltinAdditionalData::Signature(signatures)
+        BuiltinAdditionalData::Signature(SignatureBuiltinAdditionalData(signatures))
     }
 
     pub fn air_private_input(&self, memory: &Memory) -> Vec<PrivateInput> {
@@ -289,6 +289,7 @@ mod tests {
     };
 
     use crate::felt_str;
+    use crate::vm::runners::cairo_pie::SignatureBuiltinAdditionalData;
     #[cfg(target_arch = "wasm32")]
     use wasm_bindgen_test::*;
 
@@ -640,7 +641,7 @@ mod tests {
         )]);
         assert_eq!(
             builtin.get_additional_data(),
-            BuiltinAdditionalData::Signature(signatures)
+            BuiltinAdditionalData::Signature(SignatureBuiltinAdditionalData(signatures))
         )
     }
 }
