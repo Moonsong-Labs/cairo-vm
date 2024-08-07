@@ -66,15 +66,15 @@ thiserror-no-std = { version = "2.0.2", default-features = false }
 bitvec = { version = "1", default-features = false, features = ["alloc"] }
 
 # Dependencies for cairo-1-hints feature
-cairo-lang-starknet = { version = "2.6.4", default-features = false }
-cairo-lang-casm = { version = "2.6.4", default-features = false }
+cairo-lang-starknet = { version = "=2.6.4", default-features = false }
+cairo-lang-casm = { version = "=2.6.4", default-features = false }
 
-cairo-lang-starknet-classes = { version = "2.6.4", default-features = false }
-cairo-lang-compiler = { version = "2.6.4", default-features = false }
-cairo-lang-sierra-to-casm = { version = "2.6.4", default-features = false }
-cairo-lang-sierra = { version = "2.6.4", default-features = false }
-cairo-lang-runner = { version = "2.6.4", default-features = false }
-cairo-lang-utils = { version = "2.6.4", default-features = false }
+cairo-lang-starknet-classes = { version = "=2.6.4", default-features = false }
+cairo-lang-compiler = { version = "=2.6.4", default-features = false }
+cairo-lang-sierra-to-casm = { version = "=2.6.4", default-features = false }
+cairo-lang-sierra = { version = "=2.6.4", default-features = false }
+cairo-lang-runner = { version = "=2.6.4", default-features = false }
+cairo-lang-utils = { version = "=2.6.4", default-features = false }
 
 # TODO: check these dependencies for wasm compatibility
 ark-ff = { version = "0.4.2", default-features = false }
