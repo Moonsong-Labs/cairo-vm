@@ -20,7 +20,7 @@ exclude = ["ensure-no_std"]
 resolver = "2"
 
 [workspace.package]
-version = "1.0.0-rc5"
+version = "1.0.0-rc6"
 edition = "2021"
 license = "Apache-2.0"
 repository = "https://github.com/lambdaclass/cairo-vm/"
@@ -28,8 +28,8 @@ readme = "README.md"
 keywords = ["starknet", "cairo", "vm", "wasm", "no_std"]
 
 [workspace.dependencies]
-cairo-vm = { path = "./vm", version = "1.0.0-rc5", default-features = false }
-cairo-vm-tracer = { path = "./cairo-vm-tracer", version = "1.0.0-rc5", default-features = false }
+cairo-vm = { path = "./vm", version = "1.0.0-rc6", default-features = false }
+cairo-vm-tracer = { path = "./cairo-vm-tracer", version = "1.0.0-rc6", default-features = false }
 mimalloc = { version = "0.1.37", default-features = false }
 num-bigint = { version = "0.4", default-features = false, features = [
     "serde",
@@ -75,6 +75,7 @@ cairo-lang-sierra-to-casm = { version = "=2.6.4", default-features = false }
 cairo-lang-sierra = { version = "=2.6.4", default-features = false }
 cairo-lang-runner = { version = "=2.6.4", default-features = false }
 cairo-lang-utils = { version = "=2.6.4", default-features = false }
+
 
 # TODO: check these dependencies for wasm compatibility
 ark-ff = { version = "0.4.2", default-features = false }

@@ -37,6 +37,5 @@ pub mod without_std {
 
     pub mod borrow {
         pub use alloc::borrow::*;
-        pub use core::borrow::*;
     }
 }

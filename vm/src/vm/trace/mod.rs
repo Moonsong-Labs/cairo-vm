@@ -28,7 +28,7 @@ pub mod trace_entry {
 
     pub fn relocate_trace_register(
         value: Relocatable,
-        relocation_table: &Vec<usize>,
+        relocation_table: &[usize],
     ) -> Result<usize, TraceError> {
         let segment_index: usize = value.segment_index.try_into().map_err(|_| {
             TraceError::MemoryError(MemoryError::AddressInTemporarySegment(value.segment_index))

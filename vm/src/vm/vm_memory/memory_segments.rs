@@ -67,7 +67,7 @@ impl MemorySegmentManager {
     pub fn load_data(
         &mut self,
         ptr: Relocatable,
-        data: &Vec<MaybeRelocatable>,
+        data: &[MaybeRelocatable],
     ) -> Result<Relocatable, MemoryError> {
         // Starting from the end ensures any necessary resize
         // is performed once with enough room for everything
@@ -175,7 +175,7 @@ impl MemorySegmentManager {
         if let Some(vector) = arg.downcast_ref::<Vec<MaybeRelocatable>>() {
             self.load_data(ptr, vector).map(Into::into)
         } else if let Some(vector) = arg.downcast_ref::<Vec<Relocatable>>() {
-            let data = &vector.iter().map(|value| value.into()).collect();
+            let data: &Vec<MaybeRelocatable> = &vector.iter().map(|value| value.into()).collect();
             self.load_data(ptr, data).map(Into::into)
         } else {
             Err(MemoryError::WriteArg)

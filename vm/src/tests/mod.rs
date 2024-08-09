@@ -165,7 +165,7 @@ fn run_cairo_1_entrypoint(
 
     // Load calldata
     let calldata_start = runner.vm.add_memory_segment();
-    let calldata_end = runner.vm.load_data(calldata_start, &args.to_vec()).unwrap();
+    let calldata_end = runner.vm.load_data(calldata_start, args).unwrap();
 
     // Create entrypoint_args
 
@@ -269,7 +269,7 @@ fn run_cairo_1_entrypoint_with_run_resources(
 
     // Load calldata
     let calldata_start = runner.vm.add_memory_segment();
-    let calldata_end = runner.vm.load_data(calldata_start, &args.to_vec()).unwrap();
+    let calldata_end = runner.vm.load_data(calldata_start, args).unwrap();
 
     // Create entrypoint_args
 

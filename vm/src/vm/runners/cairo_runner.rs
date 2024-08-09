@@ -901,7 +901,7 @@ impl CairoRunner {
     }
 
     ///Relocates the VM's trace, turning relocatable registers to numbered ones
-    pub fn relocate_trace(&mut self, relocation_table: &Vec<usize>) -> Result<(), TraceError> {
+    pub fn relocate_trace(&mut self, relocation_table: &[usize]) -> Result<(), TraceError> {
         if self.relocated_trace.is_some() {
             return Err(TraceError::AlreadyRelocated);
         }
@@ -931,7 +931,7 @@ impl CairoRunner {
     /// Relocates the VM's memory, turning bidimensional indexes into contiguous numbers, and values
     /// into Felt252s. Uses the relocation_table to asign each index a number according to the value
     /// on its segment number.
-    fn relocate_memory(&mut self, relocation_table: &Vec<usize>) -> Result<(), MemoryError> {
+    fn relocate_memory(&mut self, relocation_table: &[usize]) -> Result<(), MemoryError> {
         if !(self.relocated_memory.is_empty()) {
             return Err(MemoryError::Relocation);
         }

@@ -274,8 +274,8 @@ clippy:
 	cargo clippy --workspace --all-features --benches --examples --tests -- -D warnings
 	cargo clippy --manifest-path fuzzer/Cargo.toml --all-targets
 
-coverage:
-	cargo llvm-cov report --lcov --output-path lcov.info
+coverage: cairo_proof_programs cairo_test_programs cairo_1_test_contracts cairo_2_test_contracts
+	cargo llvm-cov --html --workspace --features "test_utils, cairo-1-hints"
 
 coverage-clean:
 	cargo llvm-cov clean
