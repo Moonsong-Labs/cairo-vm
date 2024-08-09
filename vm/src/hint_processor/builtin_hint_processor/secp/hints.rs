@@ -580,7 +580,7 @@ mod tests {
 
     #[test]
     #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
-    fn test_calculate_value() {
+    fn test_r1_get_point_from_x() {
         let mut vm = VirtualMachine::new(false);
         vm.set_fp(10);
 
@@ -591,7 +591,7 @@ mod tests {
             ((1, 1), 0),
             ((1, 2), 0),
             // v
-            ((1, 3), 1),
+            ((1, 3), 0),
             ((1, 4), 0),
             ((1, 5), 0),
         );
@@ -600,7 +600,7 @@ mod tests {
         let mut exec_scopes = ExecutionScopes::new();
 
         let x = BigInt::from(18446744069414584321u128); // Example x value
-        let v = BigInt::from(1); // Example v value (must be 0 or 1 for even/odd check)
+        let v = BigInt::from(0); // Example v value (must be 0 or 1 for even/odd check)
 
         let constants = HashMap::new();
 
@@ -639,7 +639,7 @@ mod tests {
 
     #[test]
     #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
-    fn test_pack_x_prime() {
+    fn test_reduce_value() {
         let mut vm = VirtualMachine::new(false);
 
         //Initialize fp

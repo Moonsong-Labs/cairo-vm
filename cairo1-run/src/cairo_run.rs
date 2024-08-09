@@ -854,7 +854,7 @@ fn create_entry_code(
     };
     inst.target = deref_or_immediate!(
         post_call_size
-            + casm_program.debug_info.sierra_statement_info[func.entry_point.0].start_offset
+            + casm_program.debug_info.sierra_statement_info[func.entry_point.0].code_offset
     );
     Ok((
         CasmContext {

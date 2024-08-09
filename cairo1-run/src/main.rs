@@ -183,7 +183,7 @@ fn run(args: impl Iterator<Item = String>) -> Result<Option<String>, Error> {
             let sierra_program_with_dbg =
                 compile_prepared_db(&mut db, main_crate_ids, compiler_config).unwrap();
 
-            sierra_program_with_dbg.program
+            sierra_program_with_dbg
         }
     };
 
