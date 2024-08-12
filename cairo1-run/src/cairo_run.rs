@@ -25,7 +25,6 @@ use cairo_lang_sierra::{
     program::{Function, GenericArg, Program as SierraProgram},
     program_registry::ProgramRegistry,
 };
-use cairo_lang_sierra_gas::objects::CostInfoProvider;
 use cairo_lang_sierra_to_casm::{
     compiler::{CairoProgram, SierraToCasmConfig},
     metadata::calc_metadata_ap_change_only,
@@ -855,7 +854,7 @@ fn create_entry_code(
     };
     inst.target = deref_or_immediate!(
         post_call_size
-            + casm_program.debug_info.sierra_statement_info[func.entry_point.0].code_offset
+            + casm_program.debug_info.sierra_statement_info[func.entry_point.0].start_offset
     );
     Ok((
         CasmContext {
@@ -1232,7 +1231,7 @@ fn serialize_output_inner<'a>(
                 .expect("Missing return value")
                 .get_relocatable()
                 .expect("Box Pointer is not Relocatable");
-            let type_size = type_sizes.type_size(&info.ty);
+            let type_size = type_sizes[&info.ty].try_into().expect("could not parse to usize"); 
             let data = vm
                 .get_continuous_range(ptr, type_size)
                 .expect("Failed to extract value from nullable ptr");
@@ -1301,7 +1300,7 @@ fn serialize_output_inner<'a>(
                 }
                 _ => panic!("Invalid Nullable"),
             };
-            let type_size = type_sizes.type_size(&info.ty);
+            let type_size = type_sizes[&info.ty].try_into().expect("could not parse to usize");
             let data = vm
                 .get_continuous_range(ptr, type_size)
                 .expect("Failed to extract value from nullable ptr");
@@ -1554,7 +1553,9 @@ mod tests {
             .build()
             .unwrap();
         let main_crate_ids = setup_project(&mut db, Path::new(filename)).unwrap();
-        compile_prepared_db(&mut db, main_crate_ids, compiler_config).unwrap()
+        compile_prepared_db(&mut db, main_crate_ids, compiler_config)
+            .unwrap()
+            .program
     }
 
     fn main_hash_panic_result(sierra_program: &SierraProgram) -> bool {

@@ -2,6 +2,11 @@
 
 #### Upcoming Changes
 
+#### [1.0.0-rc6] - 2024-07-22
+
+* chore: bump `cairo-lang-` dependencies to 2.7.0-rc.3 [#1807](https://github.com/lambdaclass/cairo-vm/pull/1807)
+  * chore: update Rust required version to 1.76.0
+
 #### [1.0.0-rc5] - 2024-07-13
 
 * fix: Fixed deserialization of negative numbers in scientific notation [#1804](https://github.com/lambdaclass/cairo-vm/pull/1804)

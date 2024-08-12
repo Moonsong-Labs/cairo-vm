@@ -871,7 +871,7 @@ impl VirtualMachine {
     pub fn load_data(
         &mut self,
         ptr: Relocatable,
-        data: &Vec<MaybeRelocatable>,
+        data: &[MaybeRelocatable],
     ) -> Result<Relocatable, MemoryError> {
         if ptr.segment_index == 0 {
             self.instruction_cache.resize(data.len(), None);
@@ -4218,7 +4218,7 @@ mod tests {
         let segment = vm.segments.add();
         vm.load_data(
             segment,
-            &vec![
+            &[
                 mayberelocatable!(1),
                 mayberelocatable!(2),
                 mayberelocatable!(3),
@@ -4239,7 +4239,7 @@ mod tests {
         let segment = vm.segments.add();
         vm.load_data(
             segment,
-            &vec![
+            &[
                 mayberelocatable!(1),
                 mayberelocatable!(2),
                 mayberelocatable!(3),
@@ -4397,7 +4397,7 @@ mod tests {
         assert_eq!(
             virtual_machine_from_builder
                 .builtin_runners
-                .get(0)
+                .first()
                 .unwrap()
                 .name(),
             BuiltinName::pedersen

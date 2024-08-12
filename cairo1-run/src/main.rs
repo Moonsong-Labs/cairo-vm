@@ -180,7 +180,10 @@ fn run(args: impl Iterator<Item = String>) -> Result<Option<String>, Error> {
                 .build()
                 .unwrap();
             let main_crate_ids = setup_project(&mut db, &args.filename).unwrap();
-            compile_prepared_db(&mut db, main_crate_ids, compiler_config).unwrap()
+            let sierra_program_with_dbg =
+                compile_prepared_db(&mut db, main_crate_ids, compiler_config).unwrap();
+
+            sierra_program_with_dbg.program
         }
     };
 
@@ -472,6 +475,55 @@ mod tests {
         } else {
             expected_output
         };
+        assert_matches!(run(args), Ok(Some(res)) if res == expected_output, "Program {} failed with flags {}", program, extra_flags.concat());
+    }
+
+    // these tests are separated so as to run them without --append_return_values and --proof_mode options
+    // since they require to use the squashed version of felt252
+    #[rstest]
+    #[case(
+        "dict_non_squashed/dict_with_struct_non_squash.cairo",
+        "{0: 1 true 1: 1 false 2: 1 true}",
+        None
+    )]
+    #[case(
+        "dict_non_squashed/nullable_box_vec_non_squash.cairo",
+        "{0: 10 1: 20 2: 30} 3",
+        None
+    )]
+    #[case(
+        "dict_non_squashed/felt_dict_non_squash.cairo",
+        "{66675: [8 9 10 11] 66676: [1 2 3]}",
+        None
+    )]
+    fn test_run_progarm_non_proof(
+        #[case] program: &str,
+        #[case] expected_output: &str,
+        #[case] inputs: Option<&str>,
+        #[values(
+        &["--cairo_pie_output", "/dev/null"], // Non proof-mode
+    )]
+        extra_flags: &[&str],
+    ) {
+        let common_flags = &[
+            "--print_output",
+            "--trace_file",
+            "/dev/null",
+            "--memory_file",
+            "/dev/null",
+            "--layout",
+            "all_cairo",
+        ];
+        let mut args = vec!["cairo1-run"];
+        let filename = format!("../cairo_programs/cairo-1-programs/{}", program);
+
+        args.push(&filename);
+        args.extend_from_slice(common_flags);
+        args.extend_from_slice(extra_flags);
+        if let Some(inputs) = inputs {
+            args.extend_from_slice(&["--args", inputs])
+        }
+        let args = args.iter().cloned().map(String::from);
         assert_matches!(run(args), Ok(Some(res)) if res == expected_output, "Program {} failed with flags {}", program, extra_flags.concat());
     }
 

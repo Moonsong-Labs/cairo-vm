@@ -89,6 +89,7 @@ impl From<(usize, usize)> for MemorySegmentAddresses {
     }
 }
 
+#[allow(clippy::manual_non_exhaustive)]
 #[derive(Serialize, Deserialize, Debug)]
 pub struct PublicInput<'a> {
     pub layout: &'a str,
