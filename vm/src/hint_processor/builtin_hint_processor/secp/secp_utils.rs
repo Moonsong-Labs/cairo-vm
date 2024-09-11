@@ -6,7 +6,7 @@ use crate::vm::errors::hint_errors::HintError;
 
 use lazy_static::lazy_static;
 use num_bigint::{BigInt, BigUint};
-use num_traits::Zero;
+use num_traits::{FromPrimitive, Num, Zero};
 
 // Constants in package "starkware.cairo.common.cairo_secp.constants".
 pub const BASE_86: &str = "starkware.cairo.common.cairo_secp.constants.BASE";
@@ -66,6 +66,20 @@ lazy_static! {
     pub(crate) static ref SECP256R1_ALPHA: BigInt = BigInt::from_str(
         "115792089210356248762697446949407573530086143415290314195533631308867097853948"
     ).unwrap();
+    pub(crate) static ref SECP256R1_B: BigInt = BigInt::from_str_radix(
+        "5AC635D8AA3A93E7B3EBBD55769886BC651D06B0CC53B0F63BCE3C3E27D2604B",
+        16,
+    )
+    .unwrap();
+
+    pub(crate) static ref BLS_PRIME: BigInt = BigInt::from_str(
+        "52435875175126190479447740508185965837690552500527637822603658699938581184513"
+    )
+    .unwrap();
+
+    pub(crate) static ref BLS_BASE: BigInt = BigInt::from_u64(2).unwrap().pow(86);
+
+
 }
 
 /*

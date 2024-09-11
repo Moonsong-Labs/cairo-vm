@@ -88,6 +88,9 @@ impl Cairo1HintProcessor {
             Hint::Core(CoreHintBase::Core(CoreHint::TestLessThanOrEqual { lhs, rhs, dst })) => {
                 self.test_less_than_or_equal(vm, lhs, rhs, dst)
             }
+            Hint::Core(CoreHintBase::Core(CoreHint::TestLessThanOrEqualAddress { lhs, rhs, dst })) => {
+                self.test_less_than_or_equal_address(vm, lhs, rhs, dst)
+            }
             Hint::Core(CoreHintBase::Deprecated(DeprecatedHint::Felt252DictRead {
                 dict_ptr,
                 key,
@@ -337,6 +340,21 @@ impl Cairo1HintProcessor {
     ) -> Result<(), HintError> {
         let lhs_value = res_operand_get_val(vm, lhs)?;
         let rhs_value = res_operand_get_val(vm, rhs)?;
+        let result = Felt252::from((lhs_value <= rhs_value) as u8);
+
+        vm.insert_value(cell_ref_to_relocatable(dst, vm)?, result)
+            .map_err(HintError::from)
+    }
+
+    fn test_less_than_or_equal_address(
+        &self,
+        vm: &mut VirtualMachine,
+        lhs: &ResOperand,
+        rhs: &ResOperand,
+        dst: &CellRef,
+    ) -> Result<(), HintError> {
+        let lhs_value = res_operand_get_val_maybe(vm, lhs)?;
+        let rhs_value = res_operand_get_val_maybe(vm, rhs)?;
         let result = Felt252::from((lhs_value <= rhs_value) as u8);
 
         vm.insert_value(cell_ref_to_relocatable(dst, vm)?, result)

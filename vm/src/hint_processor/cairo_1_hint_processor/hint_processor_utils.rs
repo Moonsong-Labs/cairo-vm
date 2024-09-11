@@ -65,6 +65,49 @@ pub(crate) fn get_val(
     }
 }
 
+/// Fetches the maybe relocatable value of a pointer described by the value at `cell` plus an offset
+/// from the vm.
+fn get_double_deref_maybe(
+    vm: &VirtualMachine,
+    cell: &CellRef,
+    offset: &Felt252,
+) -> Result<MaybeRelocatable, VirtualMachineError> {
+    let relocatable = get_ptr(vm, cell, offset)?;
+    vm.get_maybe(&relocatable).ok_or_else(|| {
+        VirtualMachineError::InvalidMemoryValueTemporaryAddress(Box::new(relocatable))
+    })
+}
+
+/// Fetches the maybe relocatable value of `res_operand` from the vm.
+pub(crate) fn res_operand_get_val_maybe(
+    vm: &VirtualMachine,
+    res_operand: &ResOperand,
+) -> Result<MaybeRelocatable, VirtualMachineError> {
+    match res_operand {
+        ResOperand::Deref(cell) => get_mayberelocatable(vm, cell),
+        ResOperand::DoubleDeref(cell, offset) => {
+            get_double_deref_maybe(vm, cell, &(*offset).into())
+        }
+        ResOperand::Immediate(x) => Ok(Felt252::from(x.value.clone()).into()),
+        ResOperand::BinOp(op) => {
+            let a = get_mayberelocatable(vm, &op.a)?;
+            let b = match &op.b {
+                DerefOrImmediate::Deref(cell) => get_cell_val(vm, cell)?,
+                DerefOrImmediate::Immediate(x) => Felt252::from(x.value.clone()),
+            };
+            Ok(match op.op {
+                Operation::Add => a.add_int(&b)?,
+                Operation::Mul => match a {
+                    MaybeRelocatable::RelocatableValue(_) => {
+                        panic!("mul not implemented for relocatable values")
+                    }
+                    MaybeRelocatable::Int(a) => (a * b).into(),
+                },
+            })
+        }
+    }
+}
+
 pub(crate) fn cell_ref_to_relocatable(
     cell_ref: &CellRef,
     vm: &VirtualMachine,

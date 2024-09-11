@@ -3,6 +3,7 @@
 #### Upcoming Changes
 
 * chore: bump `cairo-lang-` dependencies to 2.7.1 [#1823](https://github.com/lambdaclass/cairo-vm/pull/1823)
+* feat: Implement `SECP related` hints [#1829](https://github.com/lambdaclass/cairo-vm/pull/1829)
 
 #### [1.0.1] - 2024-08-12
 
