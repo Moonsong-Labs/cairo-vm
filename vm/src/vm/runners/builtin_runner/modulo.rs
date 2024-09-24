@@ -118,7 +118,7 @@ impl ModBuiltinRunner {
 
     pub fn initialize_segments(&mut self, segments: &mut MemorySegmentManager) {
         self.base = segments.add().segment_index as usize; // segments.add() always returns a positive index
-        self.zero_segment_index = segments.add_zero_segment(self.zero_segment_size)
+        // self.zero_segment_index = segments.add_zero_segment(self.zero_segment_size)
     }
 
     pub fn initial_stack(&self) -> Vec<MaybeRelocatable> {
