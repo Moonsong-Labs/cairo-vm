@@ -173,7 +173,8 @@ pub fn cairo_run_pie(
         }
     }
     // Load previous execution memory
-    let n_extra_segments = pie.metadata.extra_segments.len();
+    let has_zero_segment = cairo_runner.vm.segments.has_zero_segment() as usize;
+    let n_extra_segments = pie.metadata.extra_segments.len() - has_zero_segment;
     cairo_runner
         .vm
         .segments

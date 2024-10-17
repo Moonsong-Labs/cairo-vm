@@ -118,7 +118,10 @@ impl ModBuiltinRunner {
 
     pub fn initialize_segments(&mut self, segments: &mut MemorySegmentManager) {
         self.base = segments.add().segment_index as usize; // segments.add() always returns a positive index
-        self.zero_segment_index = segments.add_zero_segment(self.zero_segment_size)
+    }
+
+    pub fn initialize_zero_segment(&mut self, segments: &mut MemorySegmentManager) {
+        self.zero_segment_index = segments.add_zero_segment(self.zero_segment_size);
     }
 
     pub fn initial_stack(&self) -> Vec<MaybeRelocatable> {
@@ -677,17 +680,16 @@ fn apply_op(lhs: &BigUint, rhs: &BigUint, op: &Operation) -> Result<BigUint, Mat
 
 #[cfg(test)]
 mod tests {
-
     #[test]
     #[cfg(feature = "mod_builtin")]
-    fn test_air_private_input_small_batch_size() {
+    fn test_air_private_input_all_cairo() {
         use super::*;
         use crate::{
             air_private_input::{ModInput, ModInputInstance, ModInputMemoryVars, PrivateInput},
             hint_processor::builtin_hint_processor::builtin_hint_processor_definition::BuiltinHintProcessor,
             types::layout_name::LayoutName,
             utils::test_utils::Program,
-            vm::runners::{builtin_runner::BuiltinRunner, cairo_runner::CairoRunner},
+            vm::runners::cairo_runner::CairoRunner,
             Felt252,
         };
 
@@ -701,11 +703,6 @@ mod tests {
 
         let end = runner.initialize(false).unwrap();
         // Modify add_mod & mul_mod params
-        for runner in runner.vm.get_builtin_runners_as_mut() {
-            if let BuiltinRunner::Mod(runner) = runner {
-                runner.override_layout_params(1, 3)
-            }
-        }
 
         runner.run_until_pc(end, &mut hint_processor).unwrap();
         runner.run_for_steps(1, &mut hint_processor).unwrap();
@@ -713,6 +710,7 @@ mod tests {
         runner.read_return_values(false).unwrap();
         runner.finalize_segments().unwrap();
 
+        // We compare against the execution of python cairo-run with the same layout
         let air_private_input = runner.get_air_private_input();
         assert_eq!(
             air_private_input.0.get(&BuiltinName::add_mod).unwrap()[0],
@@ -779,7 +777,7 @@ mod tests {
                         ),])
                     }
                 ],
-                zero_value_address: 22123
+                zero_value_address: 23019
             })
         );
         assert_eq!(
@@ -877,7 +875,7 @@ mod tests {
                         ),])
                     }
                 ],
-                zero_value_address: 22123
+                zero_value_address: 23019
             })
         )
     }

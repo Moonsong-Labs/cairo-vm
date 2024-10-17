@@ -2,14 +2,26 @@
 
 #### Upcoming Changes
 
+* chore: bump pip `cairo-lang` 0.13.2 [#1827](https://github.com/lambdaclass/cairo-vm/pull/1827)
+
+* chore: bump `cairo-lang-` dependencies to 2.8.0 [#1833](https://github.com/lambdaclass/cairo-vm/pull/1833/files)
+  * chore: update Rust required version to 1.80.0
+
+* fix: Added the following VM fixes: [#1820](https://github.com/lambdaclass/cairo-vm/pull/1820)
+  * Fix zero segment location.
+  * Fix has_zero_segment naming.
+  * Fix prover input.
+  * Fix version reading when no version is supplied.
+
+
 * chore: bump `cairo-lang-` dependencies to 2.7.1 [#1823](https://github.com/lambdaclass/cairo-vm/pull/1823)
 * feat: Implement `SECP related` hints [#1829](https://github.com/lambdaclass/cairo-vm/pull/1829)
 
 #### [1.0.1] - 2024-08-12
 
-* fix(BREAKING): [#1818](https://github.com/lambdaclass/cairo-vm/pull/1818): 
-    * Fix `MemorySegmentManager::add_zero_segment` function when resizing a segment
-    * Signature change(BREAKING): `MemorySegmentManager::get_memory_holes` now receives `builtin_segment_indexes: HashSet<usize>`
+* fix(BREAKING): [#1818](https://github.com/lambdaclass/cairo-vm/pull/1818):
+  * Fix `MemorySegmentManager::add_zero_segment` function when resizing a segment
+  * Signature change(BREAKING): `MemorySegmentManager::get_memory_holes` now receives `builtin_segment_indexes: HashSet<usize>`
 
 * fix(BREAKING): Replace `CairoRunner` method `initialize_all_builtins` with `initialize_program_builtins`. Now it only initializes program builtins instead of all of them
 

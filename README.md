@@ -77,7 +77,7 @@ It's Turing-complete and it was created by [Starkware](https://starkware.co/) as
 
 These are needed in order to compile and use the project.
 
-- [Rust 1.76.0 or newer](https://www.rust-lang.org/tools/install)
+- [Rust 1.80.0 or newer](https://www.rust-lang.org/tools/install)
 - Cargo
 
 #### Optional

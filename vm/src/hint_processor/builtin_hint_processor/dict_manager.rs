@@ -159,11 +159,7 @@ impl DictTracker {
     ) -> Self {
         DictTracker {
             data: Dictionary::DefaultDictionary {
-                dict: if let Some(dict) = initial_dict {
-                    dict
-                } else {
-                    HashMap::new()
-                },
+                dict: initial_dict.unwrap_or_default(),
                 default_value: default_value.clone(),
             },
             current_ptr: base,

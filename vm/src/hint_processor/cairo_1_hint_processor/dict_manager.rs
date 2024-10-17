@@ -54,7 +54,7 @@ impl DictManagerExecScope {
 
     /// Allocates a new segment for a new dictionary and return the start of the segment.
     pub fn new_default_dict(&mut self, vm: &mut VirtualMachine) -> Result<Relocatable, HintError> {
-        let dict_segment = if self.use_temporary_segments {
+        let dict_segment = if self.use_temporary_segments && self.trackers.len() > 0 {
             vm.add_temporary_segment()
         } else {
             vm.add_memory_segment()

@@ -322,8 +322,13 @@ impl CairoPie {
     ) -> Result<CairoPie, std::io::Error> {
         use std::io::Read;
 
-        let reader = std::io::BufReader::new(zip_reader.by_name("version.json")?);
-        let version: CairoPieVersion = serde_json::from_reader(reader)?;
+        let version = match zip_reader.by_name("version.json") {
+            Ok(version_buffer) => {
+                let reader = std::io::BufReader::new(version_buffer);
+                serde_json::from_reader(reader)?
+            }
+            Err(_) => CairoPieVersion { cairo_pie: () },
+        };
 
         let reader = std::io::BufReader::new(zip_reader.by_name("metadata.json")?);
         let metadata: CairoPieMetadata = serde_json::from_reader(reader)?;
@@ -373,7 +378,7 @@ pub(super) mod serde_impl {
 
     use super::CAIRO_PIE_VERSION;
     use super::{CairoPieMemory, Pages, PublicMemoryPage, SegmentInfo};
-    #[cfg(any(target_arch = "wasm32", no_std, not(feature = "std")))]
+    #[cfg(any(target_arch = "wasm32", not(feature = "std")))]
     use crate::alloc::string::ToString;
     use crate::stdlib::prelude::{String, Vec};
     use crate::{

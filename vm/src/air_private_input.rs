@@ -19,6 +19,8 @@ pub struct AirPrivateInputSerializable {
     #[serde(skip_serializing_if = "Option::is_none")]
     range_check: Option<Vec<PrivateInput>>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    range_check96: Option<Vec<PrivateInput>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     ecdsa: Option<Vec<PrivateInput>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     bitwise: Option<Vec<PrivateInput>>,
@@ -157,6 +159,7 @@ impl AirPrivateInput {
             memory_path,
             pedersen: self.0.get(&BuiltinName::pedersen).cloned(),
             range_check: self.0.get(&BuiltinName::range_check).cloned(),
+            range_check96: self.0.get(&BuiltinName::range_check96).cloned(),
             ecdsa: self.0.get(&BuiltinName::ecdsa).cloned(),
             bitwise: self.0.get(&BuiltinName::bitwise).cloned(),
             ec_op: self.0.get(&BuiltinName::ec_op).cloned(),
@@ -212,7 +215,7 @@ mod tests {
         assert_matches::assert_matches,
     };
 
-    #[cfg(any(target_arch = "wasm32", no_std, not(feature = "std")))]
+    #[cfg(any(target_arch = "wasm32", not(feature = "std")))]
     use crate::alloc::string::ToString;
 
     #[cfg(feature = "std")]
@@ -227,6 +230,10 @@ mod tests {
                 y: Felt252::from(200),
             })]),
             range_check: Some(vec![PrivateInput::Value(PrivateInputValue {
+                index: 10000,
+                value: Felt252::from(8000),
+            })]),
+            range_check96: Some(vec![PrivateInput::Value(PrivateInputValue {
                 index: 10000,
                 value: Felt252::from(8000),
             })]),

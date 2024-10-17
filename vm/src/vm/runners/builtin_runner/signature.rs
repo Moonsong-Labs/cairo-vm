@@ -220,7 +220,6 @@ impl SignatureBuiltinRunner {
                 private_inputs.push(PrivateInput::Signature(PrivateInputSignature {
                     index: addr
                         .offset
-                        .saturating_sub(self.base)
                         .checked_div(CELLS_PER_SIGNATURE as usize)
                         .unwrap_or_default(),
                     pubkey: *pubkey,

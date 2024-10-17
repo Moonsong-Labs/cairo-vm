@@ -234,6 +234,11 @@ impl CairoRunner {
         self.initialize_builtins(allow_missing_builtins)?;
         self.initialize_segments(None);
         let end = self.initialize_main_entrypoint()?;
+        for builtin_runner in self.vm.builtin_runners.iter_mut() {
+            if let BuiltinRunner::Mod(runner) = builtin_runner {
+                runner.initialize_zero_segment(&mut self.vm.segments);
+            }
+        }
         self.initialize_vm()?;
         Ok(end)
     }

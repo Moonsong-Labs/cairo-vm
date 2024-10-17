@@ -181,7 +181,7 @@ fn run(args: impl Iterator<Item = String>) -> Result<Option<String>, Error> {
                 .unwrap();
             let main_crate_ids = setup_project(&mut db, &args.filename).unwrap();
             let sierra_program_with_dbg =
-                compile_prepared_db(&mut db, main_crate_ids, compiler_config).unwrap();
+                compile_prepared_db(&db, main_crate_ids, compiler_config).unwrap();
 
             sierra_program_with_dbg.program
         }

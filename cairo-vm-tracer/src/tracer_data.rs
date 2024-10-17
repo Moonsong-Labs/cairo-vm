@@ -67,7 +67,7 @@ impl InputCodeFile {
             format!("<span class=\"{}\">", classes.join(" ")),
         ));
         self.tags
-            .push((offset_end, -std::isize::MAX, "</span>".to_string()));
+            .push((offset_end, -isize::MAX, "</span>".to_string()));
     }
 
     pub fn to_html(&self) -> String {

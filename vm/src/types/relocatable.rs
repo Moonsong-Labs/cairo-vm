@@ -402,7 +402,6 @@ mod tests {
     use wasm_bindgen_test::*;
 
     #[cfg(feature = "std")]
-    #[cfg(feature = "std")]
     use proptest::prelude::*;
 
     #[cfg(feature = "std")]

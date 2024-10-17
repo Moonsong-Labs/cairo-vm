@@ -37,6 +37,8 @@ use super::{
 };
 
 const ADDR_BOUND: &str = "starkware.starknet.common.storage.ADDR_BOUND";
+const MAX_HIGH: &str = "starkware.cairo.common.math.split_felt.MAX_HIGH";
+const MAX_LOW: &str = "starkware.cairo.common.math.split_felt.MAX_LOW";
 
 //Implements hint: memory[ap] = 0 if 0 <= (ids.a % PRIME) < range_check_builtin.bound else 1
 pub fn is_nn(
@@ -386,13 +388,21 @@ pub fn split_felt(
     ap_tracking: &ApTracking,
     constants: &HashMap<String, Felt252>,
 ) -> Result<(), HintError> {
+    let max_high_local =
+        &Felt252::from_dec_str("10633823966279327296825105735305134080").map_err(|_| {
+            HintError::CustomHint(
+                String::from("pointer_size must be a positive integer").into_boxed_str(),
+            )
+        })?;
+    let max_low_local = &Felt252::ZERO;
+
     let assert = |b: bool, msg: &str| {
         b.then_some(())
             .ok_or_else(|| HintError::AssertionFailed(msg.to_string().into_boxed_str()))
     };
     let bound = pow2_const(128);
-    let max_high = get_constant_from_var_name("MAX_HIGH", constants)?;
-    let max_low = get_constant_from_var_name("MAX_LOW", constants)?;
+    let max_high = constants.get(MAX_HIGH).unwrap_or(max_high_local);
+    let max_low = constants.get(MAX_LOW).unwrap_or(max_low_local);
     assert(
         max_high < &bound && max_low < &bound,
         "assert ids.MAX_HIGH < 2**128 and ids.MAX_LOW < 2**128",
@@ -743,10 +753,7 @@ pub fn split_xx(
         x = &*SPLIT_XX_PRIME - x;
     }
 
-    vm.insert_value(
-        x_addr,
-        Felt252::from(&(&x & &BigUint::from(u128::max_value()))),
-    )?;
+    vm.insert_value(x_addr, Felt252::from(&(&x & &BigUint::from(u128::MAX))))?;
     vm.insert_value((x_addr + 1)?, Felt252::from(&(x >> 128_u32)))?;
 
     Ok(())
@@ -2067,9 +2074,9 @@ mod tests {
                 hint_code,
                 exec_scopes_ref!(),
                 &HashMap::from([
-                    ("MAX_LOW".to_string(), Felt252::ZERO),
+                    (MAX_LOW, Felt252::ZERO),
                     (
-                        "MAX_HIGH".to_string(),
+                        MAX_HIGH,
                         felt_str!("10633823966279327296825105735305134080")
                     )
                 ])
@@ -2107,9 +2114,9 @@ mod tests {
                 hint_code,
                 exec_scopes_ref!(),
                 &HashMap::from([
-                    ("MAX_LOW".to_string(), Felt252::ZERO),
+                    (MAX_LOW, Felt252::ZERO),
                     (
-                        "MAX_HIGH".to_string(),
+                        MAX_HIGH,
                         felt_str!("10633823966279327296825105735305134080")
                     )
                 ])
@@ -2146,9 +2153,9 @@ mod tests {
                 hint_code,
                 exec_scopes_ref!(),
                 &HashMap::from([
-                    ("MAX_LOW".to_string(), Felt252::ZERO),
+                    (MAX_LOW, Felt252::ZERO),
                     (
-                        "MAX_HIGH".to_string(),
+                        MAX_HIGH,
                         felt_str!("10633823966279327296825105735305134080")
                     )
                 ])
@@ -2189,9 +2196,9 @@ mod tests {
                 hint_code,
                 exec_scopes_ref!(),
                 &HashMap::from([
-                    ("MAX_LOW".to_string(), Felt252::ZERO),
+                    (MAX_LOW, Felt252::ZERO),
                     (
-                        "MAX_HIGH".to_string(),
+                        MAX_HIGH,
                         felt_str!("10633823966279327296825105735305134080")
                     )
                 ])
@@ -2227,9 +2234,9 @@ mod tests {
                 hint_code,
                 exec_scopes_ref!(),
                 &HashMap::from([
-                    ("MAX_LOW".to_string(), Felt252::ZERO),
+                    (MAX_LOW, Felt252::ZERO),
                     (
-                        "MAX_HIGH".to_string(),
+                        MAX_HIGH,
                         felt_str!("10633823966279327296825105735305134080")
                     )
                 ])
@@ -2260,7 +2267,7 @@ mod tests {
         //Execute the hint
         assert_matches!(
             run_hint!(vm, ids_data, hint_code),
-            Err(HintError::MissingConstant(x)) if (*x) == "MAX_HIGH"
+            Err(HintError::MissingConstant(x)) if (*x) == MAX_HIGH
         );
     }
 
@@ -2291,9 +2298,9 @@ mod tests {
                 hint_code,
                 exec_scopes_ref!(),
                 &HashMap::from([
-                    ("MAX_LOW".to_string(), Felt252::from(-1)),
+                    (MAX_LOW, Felt252::from(-1)),
                     (
-                        "MAX_HIGH".to_string(),
+                        MAX_HIGH,
                         Felt252::from(-1),
                     )
                 ])
@@ -2329,9 +2336,9 @@ mod tests {
                 hint_code,
                 exec_scopes_ref!(),
                 &HashMap::from([
-                    ("MAX_LOW".to_string(), Felt252::ZERO),
+                    (MAX_LOW, Felt252::ZERO),
                     (
-                        "MAX_HIGH".to_string(),
+                        MAX_HIGH,
                         Felt252::ZERO,
                     )
                 ])

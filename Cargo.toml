@@ -6,13 +6,9 @@ members = [
     "examples/wasm-demo",
     "cairo1-run",
     "cairo-vm-tracer",
-    "examples/hyper_threading"
+    "examples/hyper_threading",
 ]
-default-members = [
-    "cairo-vm-cli",
-    "vm",
-    "cairo1-run",
-]
+default-members = ["cairo-vm-cli", "vm", "cairo1-run"]
 exclude = ["ensure-no_std"]
 
 # Explicitly set the resolver to the default for edition >= 2021
@@ -66,15 +62,15 @@ thiserror-no-std = { version = "2.0.2", default-features = false }
 bitvec = { version = "1", default-features = false, features = ["alloc"] }
 
 # Dependencies for cairo-1-hints feature
-cairo-lang-starknet = { version = "2.7.1", default-features = false }
-cairo-lang-casm = { version = "2.7.1", default-features = false }
+cairo-lang-starknet = { version = "2.8.0", default-features = false }
+cairo-lang-casm = { version = "2.8.0", default-features = false }
 
-cairo-lang-starknet-classes = { version = "2.7.1", default-features = false }
-cairo-lang-compiler = { version = "=2.7.1", default-features = false }
-cairo-lang-sierra-to-casm = { version = "2.7.1", default-features = false }
-cairo-lang-sierra = { version = "2.7.1", default-features = false }
-cairo-lang-runner = { version = "2.7.1", default-features = false }
-cairo-lang-utils = { version = "=2.7.1", default-features = false }
+cairo-lang-starknet-classes = { version = "2.8.0", default-features = false }
+cairo-lang-compiler = { version = "=2.8.0", default-features = false }
+cairo-lang-sierra-to-casm = { version = "2.8.0", default-features = false }
+cairo-lang-sierra = { version = "2.8.0", default-features = false }
+cairo-lang-runner = { version = "2.8.0", default-features = false }
+cairo-lang-utils = { version = "=2.8.0", default-features = false }
 
 # TODO: check these dependencies for wasm compatibility
 ark-ff = { version = "0.4.2", default-features = false }
