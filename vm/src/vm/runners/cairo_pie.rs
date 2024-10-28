@@ -759,6 +759,9 @@ pub(super) mod serde_impl {
             BuiltinName::ec_op,
             BuiltinName::keccak,
             BuiltinName::poseidon,
+            BuiltinName::range_check96,
+            BuiltinName::add_mod,
+            BuiltinName::mul_mod,
         ];
 
         for name in BUILTIN_ORDERED_LIST {
