@@ -255,10 +255,11 @@ impl CairoPie {
             HashMap::from_iter(segment_sizes.iter().map(|si| (si.index, si.size)));
 
         let validate_addr = |addr: Relocatable| -> Result<(), CairoPieValidationError> {
-            if !segment_sizes
-                .get(&addr.segment_index)
-                .is_some_and(|size| addr.offset <= *size)
-            {
+            if let Some(&size) = segment_sizes.get(&addr.segment_index) {
+                if size == 0 || addr.offset > size {
+                    return Err(CairoPieValidationError::InvalidAddress);
+                }
+            } else {
                 return Err(CairoPieValidationError::InvalidAddress);
             }
             Ok(())
